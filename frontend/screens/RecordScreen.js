@@ -5,8 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Audio } from "expo-av";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function RecordScreen({ navigation }) {
   const [recording, setRecording] = useState(null);
@@ -21,43 +24,91 @@ export default function RecordScreen({ navigation }) {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-      const { recording } = await Audio.Recording.createAsync(
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
-      setRecording(recording);
+      setRecording(newRecording);
     } catch (err) {
-      console.error("Error al grabar", err);
+      console.error("Error al empezar a grabar:", err);
     }
   }
 
   async function stopRecording() {
-    setRecording(undefined);
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    processAudio(uri);
-  }
+    if (!recording) return;
 
-  async function processAudio(uri) {
+    console.log("Deteniendo grabación...");
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      console.log("Grabación guardada en el móvil en:", uri);
+
+      setRecording(undefined);
+
+      await uploadAudio(uri);
+    } catch (error) {
+      console.error("Error al detener la grabación:", error);
+      setIsProcessing(false);
+    }
+  }
+
+  async function uploadAudio(uri) {
+    if (!API_URL) {
+      Alert.alert("Error", "Falta la variable de entorno en el archivo .env");
+      setIsProcessing(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", {
+      uri: uri,
+      name: "audio_paciente.m4a",
+      type: "audio/m4a",
+    });
+
+    try {
+      console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
+
+      const response = await fetch(`${API_URL}/api/audio/upload`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const result = await response.json();
+      console.log("Respuesta de Spring Boot:", result);
+
       const mockData = {
         reasonForVisit: "Dolor lumbar persistente tras cargar peso.",
         height: 180,
         weight: 85.5,
         pulse: 72,
       };
+
       setIsProcessing(false);
+      Alert.alert(
+        "¡Audio Enviado!",
+        "El servidor Java ha recibido el archivo.",
+      );
+
       navigation.navigate("Form", { data: mockData });
-    }, 3000);
+    } catch (error) {
+      console.error("Error en el Fetch:", error);
+      Alert.alert("Error de Conexión", "No se pudo alcanzar el backend.");
+      setIsProcessing(false);
+    }
   }
 
   return (
     <View style={styles.container}>
       {isProcessing ? (
-        <View>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.text}>IA Analizando el audio...</Text>
+        <View style={styles.processingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.text}>Enviando a Java...</Text>
         </View>
       ) : (
         <TouchableOpacity
@@ -83,6 +134,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f5f5f5",
   },
+  processingContainer: {
+    alignItems: "center",
+  },
   button: {
     width: 150,
     height: 150,
@@ -90,9 +144,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   buttonStart: { backgroundColor: "#4CAF50" },
   buttonStop: { backgroundColor: "#F44336" },
   buttonText: { color: "white", fontWeight: "bold", fontSize: 20 },
-  text: { marginTop: 20, fontSize: 16, color: "#666" },
+  text: { marginTop: 20, fontSize: 16, color: "#666", fontWeight: "600" },
 });
