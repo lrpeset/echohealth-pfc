@@ -1,0 +1,14 @@
+# Dependencies
+**/node_modules/
+**/target/
+**/.expo/
+
+# IDEs & System
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Secrets
+.env
+.api-key
