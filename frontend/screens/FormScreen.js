@@ -9,6 +9,8 @@ import {
   Alert,
 } from "react-native";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 export default function FormScreen({ route, navigation }) {
   const { data } = route.params;
 
@@ -70,9 +72,39 @@ export default function FormScreen({ route, navigation }) {
     }
   };
 
-  const finalize = () => {
-    Alert.alert("Éxito", "Historia clínica guardada correctamente.");
-    navigation.popToTop();
+const finalize = async () => {
+    const finalizedData = {
+      reasonForVisit: reason,
+      height: parseInt(height),
+      weight: parseFloat(weight),
+      pulse: parseInt(pulse),
+      validatedAt: new Date().toISOString()
+    };
+
+    try {
+      console.log("Enviando datos finales al backend...");
+      
+      const response = await fetch(`${API_URL}/api/consultations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain",
+        },
+        body: JSON.stringify(finalizedData),
+      });
+
+      if (response.ok) {
+        Alert.alert(
+          "Guardado", 
+          "La consulta se ha persistido en la base de datos correctamente.",
+          [{ text: "OK", onPress: () => navigation.popToTop() }]
+        );
+      } else {
+        throw new Error("Error en la respuesta del servidor");
+      }
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      Alert.alert("Error", "No se pudo conectar con el servidor para guardar.");
+    }
   };
 
   return (
