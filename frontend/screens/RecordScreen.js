@@ -82,23 +82,20 @@ export default function RecordScreen({ navigation }) {
       const result = await response.json();
       console.log("Respuesta de Spring Boot:", result);
 
-      const mockData = {
-        reasonForVisit: "Dolor lumbar persistente tras cargar peso.",
-        height: 180,
-        weight: 85.5,
-        pulse: 72,
-      };
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       setIsProcessing(false);
       Alert.alert(
-        "¡Audio Enviado!",
-        "El servidor Java ha recibido el archivo.",
+        "¡Audio Analizado!",
+        "La IA ha extraído los datos correctamente.",
       );
 
-      navigation.navigate("Form", { data: mockData });
+      navigation.navigate("Form", { data: result });
     } catch (error) {
       console.error("Error en el Fetch:", error);
-      Alert.alert("Error de Conexión", "No se pudo alcanzar el backend.");
+      Alert.alert("Error", error.message || "No se pudo procesar el audio.");
       setIsProcessing(false);
     }
   }

@@ -23,16 +23,21 @@ public class GeminiService {
         
         try (Client client = Client.builder().apiKey(apiKey).build()) {
 
-            String prompt = "Eres un asistente médico experto. Analiza este audio de una consulta y extrae: " +
-                    "1. Motivo de visita (reasonForVisit). 2. Altura en cm (height). " +
-                    "3. Peso en kg (weight). 4. Pulso (pulse).";
+            String prompt = 
+                "You are an expert medical assistant. Analyze this consultation audio and extract the patient data. " +
+                "Return a JSON with these exact keys: " +
+                "1. 'reasonForVisit' (string, summarize the reason concisely IN SPANISH). " +
+                "2. 'height' (number, in cm). " +
+                "3. 'weight' (number, in kg). " +
+                "4. 'pulse' (number, bpm). " +
+                "Rule: Do not translate the medical concepts to English, keep the text values in Spanish.";
 
             Part textPart = Part.builder().text(prompt).build();
             
             Part audioPart = Part.builder()
                     .inlineData(Blob.builder()
                             .data(file.getBytes()) 
-                            .mimeType("audio/mp3") 
+                            .mimeType("audio/.m4a") 
                             .build())
                     .build();
 
