@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -12,63 +12,121 @@ import {
 export default function FormScreen({ route, navigation }) {
   const { data } = route.params;
 
-  const [reason, setReason] = useState(data.reasonForVisit);
-  const [height, setHeight] = useState(data.height.toString());
-  const [weight, setWeight] = useState(data.weight.toString());
-  const [pulse, setPulse] = useState(data.pulse.toString());
+  const [reason, setReason] = useState(data?.reasonForVisit || "");
+  const [height, setHeight] = useState(data?.height?.toString() || "");
+  const [weight, setWeight] = useState(data?.weight?.toString() || "");
+  const [pulse, setPulse] = useState(data?.pulse?.toString() || "");
+
+  const reasonRef = useRef();
+  const heightRef = useRef();
+  const weightRef = useRef();
+  const pulseRef = useRef();
+
+  const hasChanges = () => {
+    return (
+      reason !== (data?.reasonForVisit || "") ||
+      height !== (data?.height?.toString() || "") ||
+      weight !== (data?.weight?.toString() || "") ||
+      pulse !== (data?.pulse?.toString() || "")
+    );
+  };
 
   const handleSave = () => {
-    Alert.alert(
-      "Éxito",
-      "Historia clínica validada y lista para enviar al backend.",
-    );
-    navigation.popToTop(); // Volver al inicio
+    if (!reason.trim()) {
+      Alert.alert(
+        "Campo requerido",
+        "Por favor, completa el motivo de la visita.",
+      );
+      reasonRef.current.focus();
+      return;
+    }
+    if (!height.trim()) {
+      Alert.alert("Campo requerido", "La altura es obligatoria.");
+      heightRef.current.focus();
+      return;
+    }
+    if (!weight.trim()) {
+      Alert.alert("Campo requerido", "El peso es obligatorio.");
+      weightRef.current.focus();
+      return;
+    }
+    if (!pulse.trim()) {
+      Alert.alert("Campo requerido", "El pulso es obligatorio.");
+      pulseRef.current.focus();
+      return;
+    }
+
+    if (!hasChanges()) {
+      Alert.alert(
+        "Verificación de seguridad",
+        "No has realizado ninguna modificación en los datos extraídos por la IA. ¿Has revisado que toda la información es correcta?",
+        [
+          { text: "Revisar de nuevo", style: "cancel" },
+          { text: "Sí, es correcto", onPress: () => finalize() },
+        ],
+      );
+    } else {
+      finalize();
+    }
+  };
+
+  const finalize = () => {
+    Alert.alert("Éxito", "Historia clínica guardada correctamente.");
+    navigation.popToTop();
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.label}>Motivo de la visita:</Text>
       <TextInput
+        ref={reasonRef}
         style={[styles.input, { height: 100 }]}
         multiline
         value={reason}
         onChangeText={setReason}
+        placeholder="Ej: Dolor de garganta..."
       />
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Text style={styles.label}>Altura (cm):</Text>
           <TextInput
+            ref={heightRef}
             style={styles.input}
             keyboardType="numeric"
             value={height}
             onChangeText={setHeight}
+            placeholder="170"
           />
         </View>
         <View style={styles.flex1}>
           <Text style={styles.label}>Peso (kg):</Text>
           <TextInput
+            ref={weightRef}
             style={styles.input}
             keyboardType="numeric"
             value={weight}
             onChangeText={setWeight}
+            placeholder="70"
           />
         </View>
       </View>
 
       <Text style={styles.label}>Pulso (ppm):</Text>
       <TextInput
+        ref={pulseRef}
         style={styles.input}
         keyboardType="numeric"
         value={pulse}
         onChangeText={setPulse}
+        placeholder="80"
       />
 
-      <View style={{ marginTop: 30 }}>
+      <View style={{ marginTop: 30, marginBottom: 50 }}>
         <Button
           title="Validar y Guardar"
           onPress={handleSave}
-          color="#2196F3"
+          color="#4CAF50"
         />
       </View>
     </ScrollView>
@@ -85,6 +143,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 20,
     fontSize: 16,
+    color: "#000",
   },
   row: { flexDirection: "row", gap: 10 },
   flex1: { flex: 1 },
