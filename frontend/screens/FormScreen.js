@@ -12,7 +12,7 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function FormScreen({ route, navigation }) {
-  const { data } = route.params;
+  const { data, isReadOnly = false } = route.params;
 
   const [reason, setReason] = useState(data?.reasonForVisit || "");
   const [height, setHeight] = useState(data?.height?.toString() || "");
@@ -37,7 +37,7 @@ export default function FormScreen({ route, navigation }) {
     if (!reason.trim()) {
       Alert.alert(
         "Campo requerido",
-        "Por favor, completa el motivo de la visita.",
+        "Por favor, completa el motivo de la visita."
       );
       reasonRef.current.focus();
       return;
@@ -65,14 +65,14 @@ export default function FormScreen({ route, navigation }) {
         [
           { text: "Revisar de nuevo", style: "cancel" },
           { text: "Sí, es correcto", onPress: () => finalize() },
-        ],
+        ]
       );
     } else {
       finalize();
     }
   };
 
-const finalize = async () => {
+  const finalize = async () => {
     const finalizedData = {
       reasonForVisit: reason,
       height: parseInt(height),
@@ -109,14 +109,21 @@ const finalize = async () => {
 
   return (
     <ScrollView style={styles.container}>
+      {isReadOnly && (
+        <View style={styles.readOnlyBadge}>
+          <Text style={styles.readOnlyText}>HISTORIAL CLÍNICO</Text>
+        </View>
+      )}
+
       <Text style={styles.label}>Motivo de la visita:</Text>
       <TextInput
         ref={reasonRef}
-        style={[styles.input, { height: 100 }]}
+        style={[styles.input, { height: 100 }, isReadOnly && styles.readOnlyInput]}
         multiline
         value={reason}
         onChangeText={setReason}
         placeholder="Ej: Dolor de garganta..."
+        editable={!isReadOnly}
       />
 
       <View style={styles.row}>
@@ -124,22 +131,24 @@ const finalize = async () => {
           <Text style={styles.label}>Altura (cm):</Text>
           <TextInput
             ref={heightRef}
-            style={styles.input}
+            style={[styles.input, isReadOnly && styles.readOnlyInput]}
             keyboardType="numeric"
             value={height}
             onChangeText={setHeight}
             placeholder="170"
+            editable={!isReadOnly}
           />
         </View>
         <View style={styles.flex1}>
           <Text style={styles.label}>Peso (kg):</Text>
           <TextInput
             ref={weightRef}
-            style={styles.input}
+            style={[styles.input, isReadOnly && styles.readOnlyInput]}
             keyboardType="numeric"
             value={weight}
             onChangeText={setWeight}
             placeholder="70"
+            editable={!isReadOnly}
           />
         </View>
       </View>
@@ -147,20 +156,23 @@ const finalize = async () => {
       <Text style={styles.label}>Pulso (ppm):</Text>
       <TextInput
         ref={pulseRef}
-        style={styles.input}
+        style={[styles.input, isReadOnly && styles.readOnlyInput]}
         keyboardType="numeric"
         value={pulse}
         onChangeText={setPulse}
         placeholder="80"
+        editable={!isReadOnly}
       />
 
-      <View style={{ marginTop: 30, marginBottom: 50 }}>
-        <Button
-          title="Validar y Guardar"
-          onPress={handleSave}
-          color="#4CAF50"
-        />
-      </View>
+      {!isReadOnly && (
+        <View style={{ marginTop: 30, marginBottom: 50 }}>
+          <Button
+            title="Validar y Guardar"
+            onPress={handleSave}
+            color="#4CAF50"
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -176,6 +188,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 16,
     color: "#000",
+  },
+  readOnlyInput: {
+    backgroundColor: "#f0f0f0",
+    color: "#555",
+    borderColor: "transparent",
+  },
+  readOnlyBadge: {
+    backgroundColor: "#e0e0e0",
+    padding: 8,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+    marginBottom: 20,
+  },
+  readOnlyText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#555",
   },
   row: { flexDirection: "row", gap: 10 },
   flex1: { flex: 1 },
