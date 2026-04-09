@@ -19,39 +19,60 @@ public class GeminiService {
     @Value("${google.api.key}")
     private String apiKey;
 
+    // Constante optimizada para tokens y precisión en diálogos reales
+    private static final String MEDICAL_PROMPT = """
+        Act as an expert Medical Scribe. Extract clinical data from the consultation audio into strict JSON.
+
+        RULES:
+        1. reasonForVisit: Professional clinical summary in SPANISH.
+        2. ANONYMIZATION (CRITICAL): NEVER include patient names, locations, or personal identifiers. Use neutral language like "Paciente refiere..." or passive voice.
+        3. height (cm), weight (kg), pulse (bpm): Extract as numbers.
+        4. If values are corrected in audio, use the LAST validated one.
+        5. Use null if a missing data point.
+            
+        OUTPUT FORMAT (Strict JSON):
+        {
+            "reasonForVisit": "string or null",
+            "height": number or null,
+            "weight": number or null,
+            "pulse": number or null
+        }
+        """;
+
     public String analyzeAudio(MultipartFile file) {
-        
+
         try (Client client = Client.builder().apiKey(apiKey).build()) {
 
-            String prompt = 
-                "You are an expert medical assistant. Analyze this consultation audio and extract the patient data. " +
-                "Return a JSON with these exact keys: " +
-                "1. 'reasonForVisit' (string, summarize the reason concisely IN SPANISH). " +
-                "2. 'height' (number, in cm). " +
-                "3. 'weight' (number, in kg). " +
-                "4. 'pulse' (number, bpm). " +
-                "Rule: Do not translate the medical concepts to English, keep the text values in Spanish.";
+            String mimeType = file.getContentType();
+            if (mimeType == null || mimeType.isEmpty() || mimeType.equals("application/octet-stream")) {
+                mimeType = "audio/m4a";
+            }
 
-            Part textPart = Part.builder().text(prompt).build();
-            
+            System.out.println("Procesando audio con MimeType detectado: " + mimeType);
+
+            Part textPart = Part.builder()
+                    .text(MEDICAL_PROMPT)
+                    .build();
+
             Part audioPart = Part.builder()
                     .inlineData(Blob.builder()
-                            .data(file.getBytes()) 
-                            .mimeType("audio/.m4a") 
+                            .data(file.getBytes())
+                            .mimeType(mimeType)
                             .build())
                     .build();
 
-            Content content = Content.builder().parts(Arrays.asList(textPart, audioPart)).build();
+            Content content = Content.builder()
+                    .parts(Arrays.asList(textPart, audioPart))
+                    .build();
 
             GenerateContentConfig config = GenerateContentConfig.builder()
                     .responseMimeType("application/json")
                     .build();
 
             GenerateContentResponse response = client.models.generateContent(
-                    "gemini-2.5-flash", 
-                    content, 
-                    config
-            );
+                    "gemini-2.5-flash",
+                    content,
+                    config);
 
             return response.text();
 
