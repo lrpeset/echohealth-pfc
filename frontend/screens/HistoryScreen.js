@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { mockConsultations } from "../mocks/consultationsMock";
 import {
   View,
   Text,
@@ -8,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { getIconForConsultation } from "../utils/iconUtils";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -18,13 +21,12 @@ export default function HistoryScreen({ navigation }) {
   const fetchAllConsultations = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/consultations`);
-      const data = await response.json();
-      // Aquí guardamos TODAS, sin el .slice(0, 3)
-      setConsultations(data);
+      setTimeout(() => {
+        setConsultations(mockConsultations);
+        setLoading(false);
+      }, 500);
     } catch (error) {
       console.error("Error al obtener el historial:", error);
-    } finally {
       setLoading(false);
     }
   };
@@ -32,29 +34,44 @@ export default function HistoryScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchAllConsultations();
-    }, [])
+    }, []),
   );
 
   const renderItem = ({ item }) => {
     const content = JSON.parse(item.contentJson);
-    
+    const iconData = getIconForConsultation(content.reasonForVisit);
     const dateObj = new Date(item.createdAt);
     const date = dateObj.toLocaleDateString("es-ES");
-    const time = dateObj.toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' });
+    const time = dateObj.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() =>
-          navigation.navigate("Form", { data: content, isReadOnly: true })
+          navigation.navigate("Form", {
+            data: content,
+            isReadOnly: true,
+            consultationId: item.id,
+          })
         }
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.dateText}>{date} - {time}</Text>
+        <View style={styles.iconContainer}>
+          <Ionicons name={iconData.name} size={28} color={iconData.color} />
         </View>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {content.reasonForVisit || "Sin motivo registrado"}
-        </Text>
+
+        <View style={styles.textContainer}>
+          <Text style={styles.dateText}>
+            {date} - {time}
+          </Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {content.reasonForVisit || "Sin motivo registrado"}
+          </Text>
+        </View>
+
+        <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
       </TouchableOpacity>
     );
   };
@@ -67,7 +84,9 @@ export default function HistoryScreen({ navigation }) {
         </View>
       ) : consultations.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No hay registros en el historial.</Text>
+          <Text style={styles.emptyText}>
+            No hay registros en el historial.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -83,30 +102,48 @@ export default function HistoryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f7fa" },
+  container: { flex: 1, backgroundColor: "#F5F7FA" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  listPadding: { padding: 20 },
+  listPadding: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20 },
+
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
-    marginBottom: 15,
-    elevation: 2,
+    marginBottom: 12,
+    elevation: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    borderLeftWidth: 5,
-    borderLeftColor: "#2196F3",
+    borderWidth: 1,
+    borderColor: "#E1E4E8",
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F2F4F8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-  dateText: { fontSize: 13, color: "#7f8c8d", fontWeight: "600" },
-  cardTitle: { fontSize: 16, color: "#2c3e50", fontWeight: "500", lineHeight: 22 },
-  emptyText: { color: "#95a5a6", fontSize: 16 },
-}); {
-    
-}
+  textContainer: {
+    flex: 1,
+  },
+  dateText: {
+    fontSize: 13,
+    color: "#7F8C8D",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  cardTitle: {
+    fontSize: 16,
+    color: "#2C3E50",
+    fontWeight: "500",
+    lineHeight: 22,
+  },
+  emptyText: { color: "#95A5A6", fontSize: 16 },
+});
