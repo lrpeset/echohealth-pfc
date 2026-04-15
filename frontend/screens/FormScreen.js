@@ -9,8 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_URL, MOCK_MODE } from "../config";
 
 export default function FormScreen({ route, navigation }) {
   const { data, isReadOnly = false, consultationId = null } = route.params;
@@ -87,11 +86,18 @@ export default function FormScreen({ route, navigation }) {
   const finalize = async () => {
     const finalizedData = {
       reasonForVisit: reason,
+      category: data?.category || null,
       height: parseInt(height),
       weight: parseFloat(weight),
       pulse: parseInt(pulse),
       validatedAt: new Date().toISOString(),
     };
+
+    if (MOCK_MODE) {
+      Alert.alert("Modo Mock", "Simulación: Datos enviados correctamente.");
+      navigation.popToTop();
+      return;
+    }
 
     try {
       const method = consultationId ? "PUT" : "POST";
@@ -101,15 +107,13 @@ export default function FormScreen({ route, navigation }) {
 
       console.log(`Enviando petición ${method} a: ${endpoint}`);
 
-      /* // DESCOMENTAR CUANDO EL BACKEND TENGA EL @PutMapping
       const response = await fetch(endpoint, {
         method: method,
-        headers: { "Content-Type": "text/plain" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalizedData),
       });
 
       if (!response.ok) throw new Error("Error en el servidor");
-      */
 
       // Simulación de guardado para el Mock
       Alert.alert(

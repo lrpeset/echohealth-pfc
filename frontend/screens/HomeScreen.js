@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { API_URL, MOCK_MODE } from "../config";
 import { mockConsultations } from "../mocks/consultationsMock";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -12,21 +13,29 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
 export default function HomeScreen({ navigation }) {
   const [recentConsultations, setRecentConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchConsultations = async () => {
     setLoading(true);
-    try {
+
+    if (MOCK_MODE) {
+      console.log("🛠️ Usando datos de MOCK");
       setTimeout(() => {
         setRecentConsultations(mockConsultations.slice(0, 3));
         setLoading(false);
       }, 500);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/consultations`);
+      const data = await response.json();
+      setRecentConsultations(data.slice(0, 3));
     } catch (error) {
-      console.error("Error al obtener consultas:", error);
+      console.error("Error en conexión real:", error);
+    } finally {
       setLoading(false);
     }
   };
@@ -40,8 +49,8 @@ export default function HomeScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const content = JSON.parse(item.contentJson);
     const date = new Date(item.createdAt).toLocaleDateString("es-ES");
-    const iconData = getIconForConsultation(content.reasonForVisit);
-
+    const iconData = getIconForConsultation(content.reasonForVisit, content.category);
+    
     return (
       <TouchableOpacity
         style={styles.card}
