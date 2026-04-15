@@ -1,8 +1,9 @@
 package com.echohealth.backend.controller;
 
 import com.echohealth.backend.model.Consultation;
-import com.echohealth.backend.repository.ConsultationRepository;
+import com.echohealth.backend.service.ConsultationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,17 +14,22 @@ import java.util.List;
 public class ConsultationController {
 
     @Autowired
-    private ConsultationRepository repository;
+    private ConsultationService service;
 
     @GetMapping
     public List<Consultation> getAll() {
-        return repository.findAllByOrderByCreatedAtDesc();
+        return service.findAll();
     }
 
     @PostMapping
     public Consultation save(@RequestBody String jsonBody) {
-        Consultation consultation = new Consultation();
-        consultation.setContentJson(jsonBody);
-        return repository.save(consultation);
+        return service.save(jsonBody);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Consultation> update(@PathVariable Long id, @RequestBody String jsonBody) {
+        return service.update(id, jsonBody)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

@@ -25,14 +25,15 @@ public class GeminiService {
 
         RULES:
         1. reasonForVisit: Professional clinical summary in SPANISH.
-        2. ANONYMIZATION (CRITICAL): NEVER include patient names, locations, or personal identifiers. Use neutral language like "Paciente refiere..." or passive voice.
-        3. height (cm), weight (kg), pulse (bpm): Extract as numbers.
-        4. If values are corrected in audio, use the LAST validated one.
+        2. category: Categorize the visit into EXACTLY one of these: 'DOLOR', 'INFECCION', 'CARDIO', 'TRAUMA', 'ALERGIA', 'GENERAL'.
+        3. ANONYMIZATION (CRITICAL): NEVER include patient names or personal identifiers.
+        4. height (cm), weight (kg), pulse (bpm): Extract as numbers.
         5. Use null if a missing data point.
             
         OUTPUT FORMAT (Strict JSON):
         {
             "reasonForVisit": "string or null",
+            "category": "string or null",
             "height": number or null,
             "weight": number or null,
             "pulse": number or null
