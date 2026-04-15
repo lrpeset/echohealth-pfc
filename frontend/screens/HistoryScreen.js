@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { API_URL, MOCK_MODE } from "../config";
 import { mockConsultations } from "../mocks/consultationsMock";
 import {
   View,
@@ -12,21 +13,29 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
 export default function HistoryScreen({ navigation }) {
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAllConsultations = async () => {
     setLoading(true);
-    try {
+
+    if (MOCK_MODE) {
+      console.log("🛠️ Historial: Usando datos de MOCK");
       setTimeout(() => {
         setConsultations(mockConsultations);
         setLoading(false);
       }, 500);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/consultations`);
+      const data = await response.json();
+      setConsultations(data);
     } catch (error) {
-      console.error("Error al obtener el historial:", error);
+      console.error("Error al obtener el historial real:", error);
+    } finally {
       setLoading(false);
     }
   };
@@ -39,7 +48,10 @@ export default function HistoryScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const content = JSON.parse(item.contentJson);
-    const iconData = getIconForConsultation(content.reasonForVisit);
+    const iconData = getIconForConsultation(
+      content.reasonForVisit,
+      content.category,
+    );
     const dateObj = new Date(item.createdAt);
     const date = dateObj.toLocaleDateString("es-ES");
     const time = dateObj.toLocaleTimeString("es-ES", {
