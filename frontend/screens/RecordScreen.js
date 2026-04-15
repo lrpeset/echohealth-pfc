@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { Audio } from "expo-av";
+import { Ionicons } from "@expo/vector-icons";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -102,52 +103,115 @@ export default function RecordScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {isProcessing ? (
-        <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.text}>Enviando a Java...</Text>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={[
-            styles.button,
-            recording ? styles.buttonStop : styles.buttonStart,
-          ]}
-          onPress={recording ? stopRecording : startRecording}
-        >
-          <Text style={styles.buttonText}>
-            {recording ? "PARAR" : "GRABAR"}
-          </Text>
-        </TouchableOpacity>
-      )}
+      <View style={styles.topSection}>
+        <Text style={styles.title}>
+          {isProcessing
+            ? "Analizando audio..."
+            : recording
+              ? "Escuchando..."
+              : "Listo para grabar"}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isProcessing
+            ? "Nuestra IA está extrayendo los datos clínicos."
+            : "Habla con naturalidad. La IA filtrará la información relevante."}
+        </Text>
+      </View>
+
+      <View style={styles.centerSection}>
+        {isProcessing ? (
+          <View style={styles.processingCircle}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+          </View>
+        ) : (
+          <View style={[styles.outerRing, recording && styles.outerRingActive]}>
+            <TouchableOpacity
+              style={[
+                styles.recordButton,
+                recording && styles.recordButtonActive,
+              ]}
+              onPress={recording ? stopRecording : startRecording}
+              activeOpacity={0.8}
+            >
+              {!recording && <Ionicons name="mic" size={40} color="#FFF" />}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.bottomSection}>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: "#F5F7FA" },
+  topSection: {
     flex: 1,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 30,
+    paddingBottom: 40,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  centerSection: { flex: 1.5, justifyContent: "center", alignItems: "center" },
+
+  outerRing: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
+    borderColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-  },
-  processingContainer: {
-    alignItems: "center",
-  },
-  button: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
+    backgroundColor: "#FFFFFF",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 5,
   },
-  buttonStart: { backgroundColor: "#4CAF50" },
-  buttonStop: { backgroundColor: "#F44336" },
-  buttonText: { color: "white", fontWeight: "bold", fontSize: 20 },
-  text: { marginTop: 20, fontSize: 16, color: "#666", fontWeight: "600" },
+  outerRingActive: { borderColor: "#FFCDD2" },
+  recordButton: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "#F44336",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recordButtonActive: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+  },
+
+  processingCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  bottomSection: { flex: 1 },
 });
