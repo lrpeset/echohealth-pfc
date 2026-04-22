@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/consultations")
@@ -22,13 +23,13 @@ public class ConsultationController {
     }
 
     @PostMapping
-    public Consultation save(@RequestBody String jsonBody) {
-        return service.save(jsonBody);
+    public Consultation save(@RequestBody Map<String, Object> payload) {
+        return service.save(payload);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Consultation> update(@PathVariable Long id, @RequestBody String jsonBody) {
-        return service.update(id, jsonBody)
+    public ResponseEntity<Consultation> update(@PathVariable String id, @RequestBody Map<String, Object> payload) {
+        return service.update(id, payload)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
