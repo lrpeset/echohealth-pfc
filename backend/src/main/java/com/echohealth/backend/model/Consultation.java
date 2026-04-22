@@ -1,50 +1,23 @@
 package com.echohealth.backend.model;
 
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.Map;
 
-@Entity
-@Table(name = "consultations")
+@Data
+@Document(collection = "consultations")
 public class Consultation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
     private LocalDateTime createdAt;
-
-    @Column(columnDefinition = "TEXT")
-    private String contentJson;
-
+    
+    private Map<String, Object> content; 
+    
     public Consultation() {
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getContentJson() {
-        return contentJson;
-    }
-
-    public void setContentJson(String contentJson) {
-        this.contentJson = contentJson;
-    }
-
-    @PrePersist
-    protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
 }

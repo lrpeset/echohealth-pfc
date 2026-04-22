@@ -47,10 +47,15 @@ export default function HomeScreen({ navigation }) {
   );
 
   const renderItem = ({ item }) => {
-    const content = JSON.parse(item.contentJson);
+    const content =
+      item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
+      
     const date = new Date(item.createdAt).toLocaleDateString("es-ES");
-    const iconData = getIconForConsultation(content.reasonForVisit, content.category);
-    
+    const iconData = getIconForConsultation(
+      content.reasonForVisit,
+      content.category,
+    );
+
     return (
       <TouchableOpacity
         style={styles.card}

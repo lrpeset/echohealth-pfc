@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -18,15 +19,15 @@ public class ConsultationService {
         return repository.findAllByOrderByCreatedAtDesc();
     }
 
-    public Consultation save(String jsonBody) {
+    public Consultation save(Map<String, Object> payload) {
         Consultation consultation = new Consultation();
-        consultation.setContentJson(jsonBody);
+        consultation.setContent(payload);
         return repository.save(consultation);
     }
 
-    public Optional<Consultation> update(Long id, String newJsonBody) {
+    public Optional<Consultation> update(String id, Map<String, Object> newPayload) {
         return repository.findById(id).map(existingConsultation -> {
-            existingConsultation.setContentJson(newJsonBody);
+            existingConsultation.setContent(newPayload);
             return repository.save(existingConsultation);
         });
     }

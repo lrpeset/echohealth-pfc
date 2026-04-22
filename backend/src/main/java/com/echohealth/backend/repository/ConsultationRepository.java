@@ -1,12 +1,14 @@
 package com.echohealth.backend.repository;
 
 import com.echohealth.backend.model.Consultation;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
 @Repository
-public interface ConsultationRepository extends JpaRepository<Consultation, Long> {
+public interface ConsultationRepository extends MongoRepository<Consultation, String> {
     
     List<Consultation> findAllByOrderByCreatedAtDesc();
+    
 }
