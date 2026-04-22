@@ -47,7 +47,9 @@ export default function HistoryScreen({ navigation }) {
   );
 
   const renderItem = ({ item }) => {
-    const content = JSON.parse(item.contentJson);
+    const content =
+      item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
+      
     const iconData = getIconForConsultation(
       content.reasonForVisit,
       content.category,
