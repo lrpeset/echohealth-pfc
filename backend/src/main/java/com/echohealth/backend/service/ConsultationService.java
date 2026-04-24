@@ -15,20 +15,22 @@ public class ConsultationService {
     @Autowired
     private ConsultationRepository repository;
 
-    public List<Consultation> findAll() {
-        return repository.findAllByOrderByCreatedAtDesc();
+    public List<Consultation> findAllByUserId(String userId) {
+        return repository.findByUserId(userId);
     }
 
-    public Consultation save(Map<String, Object> payload) {
+    public Consultation save(Map<String, Object> payload, String userId) {
         Consultation consultation = new Consultation();
         consultation.setContent(payload);
+        consultation.setUserId(userId);
         return repository.save(consultation);
     }
 
-    public Optional<Consultation> update(String id, Map<String, Object> newPayload) {
-        return repository.findById(id).map(existingConsultation -> {
-            existingConsultation.setContent(newPayload);
-            return repository.save(existingConsultation);
+    public Optional<Consultation> update(String id, Map<String, Object> newPayload, String userId) {
+        return repository.findById(id).filter(c -> c.getUserId().equals(userId))
+                .map(existingConsultation -> {
+                    existingConsultation.setContent(newPayload);
+                    return repository.save(existingConsultation);
         });
     }
 }

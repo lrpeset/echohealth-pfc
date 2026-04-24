@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -18,18 +19,19 @@ public class ConsultationController {
     private ConsultationService service;
 
     @GetMapping
-    public List<Consultation> getAll() {
-        return service.findAll();
+    public List<Consultation> getAll(Principal principal) {
+        return service.findAllByUserId(principal.getName());
     }
 
     @PostMapping
-    public Consultation save(@RequestBody Map<String, Object> payload) {
-        return service.save(payload);
+    public Consultation save(@RequestBody Map<String, Object> payload, Principal principal) {
+        return service.save(payload, principal.getName());
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Consultation> update(@PathVariable String id, @RequestBody Map<String, Object> payload) {
-        return service.update(id, payload)
+    public ResponseEntity<Consultation> update(@PathVariable String id, @RequestBody Map<String, Object> payload,
+            Principal principal) {
+        return service.update(id, payload, principal.getName())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
