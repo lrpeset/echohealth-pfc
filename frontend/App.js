@@ -9,6 +9,7 @@ import HomeScreen from "./screens/HomeScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import RecordScreen from "./screens/RecordScreen";
 import FormScreen from "./screens/FormScreen";
+import LoginScreen from "./screens/LoginScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,7 +52,14 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
-      <Stack.Navigator>
+      <Stack.Navigator initialRouteName="Login">
+        
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+
         <Stack.Screen
           name="Main"
           component={MainTabs}
@@ -61,7 +69,6 @@ export default function App() {
         <Stack.Group
           screenOptions={({ navigation }) => ({
             presentation: "modal",
-            // Añadimos un botón de cierre por defecto para todos los modales
             headerLeft: () => (
               <Ionicons
                 name="close"
