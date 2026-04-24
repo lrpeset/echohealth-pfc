@@ -9,13 +9,33 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function HomeScreen({ navigation }) {
   const [recentConsultations, setRecentConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro de que quieres salir de tu cuenta?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Salir",
+          style: "destructive",
+          onPress: async () => {
+            await AsyncStorage.removeItem("userToken");
+            navigation.replace("Login");
+          },
+        },
+      ],
+    );
+  };
 
   const fetchConsultations = async () => {
     setLoading(true);
@@ -30,7 +50,12 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/consultations`);
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await fetch(`${API_URL}/api/consultations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await response.json();
       setRecentConsultations(data.slice(0, 3));
     } catch (error) {
@@ -49,7 +74,7 @@ export default function HomeScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const content =
       item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
-      
+
     const date = new Date(item.createdAt).toLocaleDateString("es-ES");
     const iconData = getIconForConsultation(
       content.reasonForVisit,
@@ -84,8 +109,22 @@ export default function HomeScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Bienvenido, Dr.</Text>
-        <Text style={styles.subtitle}>¿Qué vamos a registrar hoy?</Text>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
+          <View>
+            <Text style={styles.greeting}>Bienvenido, Dr.</Text>
+            <Text style={styles.subtitle}>¿Qué vamos a registrar hoy?</Text>
+          </View>
+
+          <TouchableOpacity onPress={handleLogout} style={{ padding: 5 }}>
+            <Ionicons name="log-out-outline" size={28} color="#E74C3C" />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.mainButton}

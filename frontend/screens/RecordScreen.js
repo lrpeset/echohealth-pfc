@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -72,11 +74,14 @@ export default function RecordScreen({ navigation }) {
     try {
       console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
 
+      const token = await AsyncStorage.getItem("userToken");
+
       const response = await fetch(`${API_URL}/api/audio/upload`, {
         method: "POST",
         body: formData,
         headers: {
           "Content-Type": "multipart/form-data",
+          "Authorization": `Bearer ${token}`
         },
       });
 
