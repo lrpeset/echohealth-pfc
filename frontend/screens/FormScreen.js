@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, MOCK_MODE } from "../config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function FormScreen({ route, navigation }) {
   const { data, isReadOnly = false, consultationId = null } = route.params;
@@ -100,16 +101,16 @@ export default function FormScreen({ route, navigation }) {
     }
 
     try {
-      const method = consultationId ? "PUT" : "POST";
-      const endpoint = consultationId
-        ? `${API_URL}/api/consultations/${consultationId}`
-        : `${API_URL}/api/consultations`;
-
       console.log(`Enviando petición ${method} a: ${endpoint}`);
+
+      const token = await AsyncStorage.getItem("userToken");
 
       const response = await fetch(endpoint, {
         method: method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(finalizedData),
       });
 

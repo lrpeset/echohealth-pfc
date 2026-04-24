@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function HistoryScreen({ navigation }) {
   const [consultations, setConsultations] = useState([]);
@@ -30,7 +31,12 @@ export default function HistoryScreen({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/consultations`);
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await fetch(`${API_URL}/api/consultations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await response.json();
       setConsultations(data);
     } catch (error) {
@@ -49,7 +55,7 @@ export default function HistoryScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const content =
       item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
-      
+
     const iconData = getIconForConsultation(
       content.reasonForVisit,
       content.category,
