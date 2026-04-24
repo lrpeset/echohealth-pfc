@@ -13,10 +13,12 @@ public class Consultation {
     @Id
     private String id;
 
+    private String userId;
+    
     private LocalDateTime createdAt;
-    
-    private Map<String, Object> content; 
-    
+
+    private Map<String, Object> content;
+
     public Consultation() {
         this.createdAt = LocalDateTime.now();
     }

@@ -8,7 +8,6 @@ import java.util.List;
 
 @Repository
 public interface ConsultationRepository extends MongoRepository<Consultation, String> {
-    
-    List<Consultation> findAllByOrderByCreatedAtDesc();
-    
+
+    List<Consultation> findByUserId(String userId);
 }
