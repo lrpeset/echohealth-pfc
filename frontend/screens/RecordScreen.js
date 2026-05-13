@@ -11,7 +11,6 @@ import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function RecordScreen({ navigation }) {
@@ -57,6 +56,13 @@ export default function RecordScreen({ navigation }) {
     }
   }
 
+  const hasAllFieldsEmpty = (result) => {
+    if (!result.fields || !Array.isArray(result.fields)) {
+      return false;
+    }
+    return result.fields.every(field => field.value === null || field.value === undefined);
+  };
+
   async function uploadAudio(uri) {
     if (!API_URL) {
       Alert.alert("Error", "Falta la variable de entorno en el archivo .env");
@@ -64,15 +70,29 @@ export default function RecordScreen({ navigation }) {
       return;
     }
 
+    const configJson = await AsyncStorage.getItem("@form_config");
+    let customConfig = [];
+    try {
+      if (configJson) customConfig = JSON.parse(configJson);
+    } catch (_e) {}
+
     const formData = new FormData();
     formData.append("file", {
       uri: uri,
       name: "audio_paciente.m4a",
       type: "audio/m4a",
     });
+    customConfig.forEach((field) => {
+      if (field.term && field.conceptId) {
+        formData.append("targetFields", `${field.conceptId}|${field.term}`);
+      }
+    });
 
     try {
-      console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
+      console.log(`📤 Enviando POST a: ${API_URL}/api/audio/upload`);
+      if (customConfig.length > 0) {
+        console.log(`🎯 Campos personalizados incluidos: ${customConfig.map(f => `${f.term} (${f.conceptId})`).join(", ")}`);
+      }
 
       const token = await AsyncStorage.getItem("userToken");
 
@@ -86,10 +106,47 @@ export default function RecordScreen({ navigation }) {
       });
 
       const result = await response.json();
-      console.log("Respuesta de Spring Boot:", result);
+      
+      console.log("📥 Respuesta recibida del backend:", JSON.stringify(result, null, 2));
 
       if (result.error) {
+        console.error("❌ Error en respuesta de Gemini:", result.error);
         throw new Error(result.error);
+      }
+
+      if (result.fields && Array.isArray(result.fields)) {
+        console.log("✅ Formato estructurado recibido - Campos:", result.fields.length);
+        
+        const allEmpty = hasAllFieldsEmpty(result);
+        
+        result.fields.forEach((field, index) => {
+          console.log(`   [${index}] ${field.id}: ${field.value} (SNOMED: ${field.conceptId || 'N/A'})`);
+        });
+
+        if (allEmpty) {
+          console.warn("⚠️ Todos los campos están vacíos - Modo fallback detectado");
+          setIsProcessing(false);
+          
+          Alert.alert(
+            "Atención: Datos no extraídos",
+            "La IA no pudo extraer los datos con claridad. Por favor, rellena el formulario manualmente.",
+            [
+              { 
+                text: "OK", 
+                onPress: () => {
+                  console.log("🔄 Navegando a FormScreen (fallback):", JSON.stringify({ data: result }, null, 2));
+                  navigation.navigate("Form", { data: result });
+                }
+              }
+            ]
+          );
+          return;
+        } else {
+          console.log("✅ Datos clínicos extraídos exitosamente");
+        }
+      } else {
+        console.warn("⚠️ Formato legacy o inesperado recibido");
+        console.warn("   keys:", Object.keys(result));
       }
 
       setIsProcessing(false);
@@ -98,9 +155,10 @@ export default function RecordScreen({ navigation }) {
         "La IA ha extraído los datos correctamente.",
       );
 
+      console.log("🔄 Navegando a FormScreen con datos:", JSON.stringify({ data: result }, null, 2));
       navigation.navigate("Form", { data: result });
     } catch (error) {
-      console.error("Error en el Fetch:", error);
+      console.error("❌ Error en el Fetch:", error);
       Alert.alert("Error", error.message || "No se pudo procesar el audio.");
       setIsProcessing(false);
     }
