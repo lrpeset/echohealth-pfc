@@ -23,6 +23,14 @@ public class ConsultationController {
         return service.findAllByUserId(principal.getName());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Consultation> getById(@PathVariable String id, Principal principal) {
+        return service.findById(id)
+                .filter(c -> c.getUserId().equals(principal.getName()))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping
     public Consultation save(@RequestBody Map<String, Object> payload, Principal principal) {
         return service.save(payload, principal.getName());
