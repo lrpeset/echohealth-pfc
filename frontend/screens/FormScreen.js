@@ -7,34 +7,106 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, MOCK_MODE } from "../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import SnomedSearchInput from "../components/SnomedSearchInput";
+
+const BASE_FIELD_CONFIG = [
+  {
+    id: "reasonForVisit",
+    label: "Motivo de la visita",
+    type: "snomed-text",
+    keyboardType: "default",
+    required: true,
+    placeholder: "Ej: Dolor de garganta, cefalea...",
+    defaultConceptId: null,
+  },
+  {
+    id: "height",
+    label: "Altura (cm)",
+    type: "snomed-number",
+    keyboardType: "numeric",
+    required: true,
+    placeholder: "175",
+    defaultConceptId: "50243002",
+    snomedTerm: "Body height measure",
+  },
+  {
+    id: "weight",
+    label: "Peso (kg)",
+    type: "snomed-number",
+    keyboardType: "numeric",
+    required: true,
+    placeholder: "72.5",
+    defaultConceptId: "271603002",
+    snomedTerm: "Body weight",
+  },
+  {
+    id: "pulse",
+    label: "Pulso (ppm)",
+    type: "snomed-number",
+    keyboardType: "numeric",
+    required: true,
+    placeholder: "72",
+    defaultConceptId: "364075005",
+    snomedTerm: "Pulse rate",
+  },
+];
 
 export default function FormScreen({ route, navigation }) {
   const { data, isReadOnly = false, consultationId = null } = route.params;
 
   const [isEditing, setIsEditing] = useState(!isReadOnly);
 
-  const [reason, setReason] = useState(data?.reasonForVisit || "");
-  const [height, setHeight] = useState(data?.height?.toString() || "");
-  const [weight, setWeight] = useState(data?.weight?.toString() || "");
-  const [pulse, setPulse] = useState(data?.pulse?.toString() || "");
+  const [clinicalFields, setClinicalFields] = useState(() => {
+    const initial = {};
 
-  const reasonRef = useRef();
-  const heightRef = useRef();
-  const weightRef = useRef();
-  const pulseRef = useRef();
+    if (data?.fields) {
+      data.fields.forEach((fd) => {
+        initial[fd.id] = {
+          value: fd.value ?? "",
+          conceptId: fd.conceptId || null,
+          term: fd.term || null,
+          type: fd.type || "snomed-text",
+          label: fd.label || "",
+          semanticTag: fd.semanticTag || null,
+          snomedVerified: !!fd.conceptId,
+        };
+      });
+    }
+
+    BASE_FIELD_CONFIG.forEach((cfg) => {
+      if (!initial[cfg.id]) {
+        const legacyValue = data?.[cfg.id];
+        initial[cfg.id] = {
+          value: legacyValue ?? "",
+          conceptId: cfg.defaultConceptId || null,
+          term: cfg.snomedTerm || null,
+          type: cfg.type,
+          label: cfg.label,
+          semanticTag: null,
+          snomedVerified: !!cfg.defaultConceptId,
+        };
+      } else {
+        initial[cfg.id].label = cfg.label;
+        initial[cfg.id].type = cfg.type;
+      }
+    });
+
+    return initial;
+  });
+
+  const fieldRefs = useRef({});
 
   useLayoutEffect(() => {
     if (isReadOnly && !isEditing) {
       navigation.setOptions({
         headerRight: () => (
-          <TouchableOpacity
-            onPress={() => setIsEditing(true)}
-            style={{ marginRight: 20 }}
-          >
+          <TouchableOpacity onPress={() => setIsEditing(true)} style={{ marginRight: 20 }}>
             <Ionicons name="create-outline" size={26} color="#4CAF50" />
           </TouchableOpacity>
         ),
@@ -48,24 +120,58 @@ export default function FormScreen({ route, navigation }) {
     }
   }, [navigation, isReadOnly, isEditing]);
 
+  const getConfig = (fieldId) => BASE_FIELD_CONFIG.find((c) => c.id === fieldId);
+
+  const handleFieldChange = (fieldId, update) => {
+    setClinicalFields((prev) => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        ...update,
+        snomedVerified: !!update.conceptId,
+      },
+    }));
+  };
+
+  const baseFieldIds = BASE_FIELD_CONFIG.map((c) => c.id);
+  const customFieldIds = Object.keys(clinicalFields).filter(
+    (id) => !baseFieldIds.includes(id)
+  );
+  const allFieldIds = [...baseFieldIds, ...customFieldIds];
+
   const hasChanges = () => {
-    return (
-      reason !== (data?.reasonForVisit || "") ||
-      height !== (data?.height?.toString() || "") ||
-      weight !== (data?.weight?.toString() || "") ||
-      pulse !== (data?.pulse?.toString() || "")
-    );
+    const originalFields = data?.fields || [];
+    return Object.keys(clinicalFields).some((fieldId) => {
+      const currentValue = clinicalFields[fieldId]?.value;
+      const originalField = originalFields.find((f) => f.id === fieldId);
+      const legacyValue = data?.[fieldId];
+      const originalValue = originalField?.value ?? legacyValue ?? "";
+      return String(currentValue) !== String(originalValue);
+    });
+  };
+
+  const validateFields = () => {
+    for (const cfg of BASE_FIELD_CONFIG) {
+      if (cfg.required) {
+        const value = clinicalFields[cfg.id]?.value;
+        if (!value || (typeof value === "string" && !value.trim())) {
+          Alert.alert("Requerido", `El campo "${cfg.label}" es obligatorio.`);
+          return false;
+        }
+        if (cfg.type === "snomed-number") {
+          const numValue = parseFloat(value);
+          if (isNaN(numValue) || numValue <= 0) {
+            Alert.alert("Inválido", `El campo "${cfg.label}" debe ser un número válido.`);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   };
 
   const handleSave = () => {
-    if (!reason.trim()) return Alert.alert("Requerido", "Completa el motivo.");
-    if (!height.trim())
-      return Alert.alert("Requerido", "La altura es obligatoria.");
-    if (!weight.trim())
-      return Alert.alert("Requerido", "El peso es obligatorio.");
-    if (!pulse.trim())
-      return Alert.alert("Requerido", "El pulso es obligatorio.");
-
+    if (!validateFields()) return;
     if (!hasChanges()) {
       if (isReadOnly) {
         setIsEditing(false);
@@ -77,7 +183,7 @@ export default function FormScreen({ route, navigation }) {
         [
           { text: "Revisar", style: "cancel" },
           { text: "Correcto", onPress: () => finalize() },
-        ],
+        ]
       );
     } else {
       finalize();
@@ -85,12 +191,21 @@ export default function FormScreen({ route, navigation }) {
   };
 
   const finalize = async () => {
-    const finalizedData = {
-      reasonForVisit: reason,
-      category: data?.category || null,
-      height: parseInt(height),
-      weight: parseFloat(weight),
-      pulse: parseInt(pulse),
+    const structuredFields = Object.entries(clinicalFields).map(
+      ([fieldId, field]) => ({
+        id: fieldId,
+        label: field.label,
+        type: field.type,
+        value: field.value,
+        conceptId: field.conceptId || null,
+        term: field.term || null,
+        semanticTag: field.semanticTag || null,
+        snomedVerified: field.snomedVerified,
+      })
+    );
+
+    const payload = {
+      fields: structuredFields,
       validatedAt: new Date().toISOString(),
     };
 
@@ -100,29 +215,29 @@ export default function FormScreen({ route, navigation }) {
       return;
     }
 
+    const method = consultationId ? "PUT" : "POST";
+    const endpoint = consultationId
+      ? `${API_URL}/api/consultations/${consultationId}`
+      : `${API_URL}/api/consultations`;
+
     try {
       console.log(`Enviando petición ${method} a: ${endpoint}`);
-
       const token = await AsyncStorage.getItem("userToken");
-
       const response = await fetch(endpoint, {
-        method: method,
-        headers: { 
+        method,
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(finalizedData),
+        body: JSON.stringify(payload),
       });
-
       if (!response.ok) throw new Error("Error en el servidor");
-
-      // Simulación de guardado para el Mock
       Alert.alert(
         "Guardado Correctamente",
         consultationId
           ? "El historial ha sido actualizado."
           : "La nueva consulta ha sido creada.",
-        [{ text: "OK", onPress: () => navigation.popToTop() }],
+        [{ text: "OK", onPress: () => navigation.popToTop() }]
       );
     } catch (error) {
       console.error("Error al guardar:", error);
@@ -130,94 +245,125 @@ export default function FormScreen({ route, navigation }) {
     }
   };
 
+  const handleCancel = () => {
+    const reset = {};
+    if (data?.fields) {
+      data.fields.forEach((fd) => {
+        reset[fd.id] = {
+          value: fd.value ?? "",
+          conceptId: fd.conceptId || null,
+          term: fd.term || null,
+          type: fd.type || "snomed-text",
+          label: fd.label || "",
+          semanticTag: fd.semanticTag || null,
+          snomedVerified: !!fd.conceptId,
+        };
+      });
+    }
+    BASE_FIELD_CONFIG.forEach((cfg) => {
+      if (!reset[cfg.id]) {
+        const legacyValue = data?.[cfg.id];
+        reset[cfg.id] = {
+          value: legacyValue ?? "",
+          conceptId: cfg.defaultConceptId || null,
+          term: cfg.snomedTerm || null,
+          type: cfg.type,
+          label: cfg.label,
+          semanticTag: null,
+          snomedVerified: !!cfg.defaultConceptId,
+        };
+      }
+    });
+    setClinicalFields(reset);
+    setIsEditing(false);
+  };
+
+  const renderField = (fieldId) => {
+    const field = clinicalFields[fieldId];
+    if (!field) return null;
+
+    const cfg = getConfig(fieldId);
+    const label = cfg?.label || field.label || fieldId;
+    const fieldType = cfg?.type || field.type || "snomed-text";
+    const isSnomedField = fieldType.startsWith("snomed-");
+    const required = cfg?.required || false;
+    const placeholder = cfg?.placeholder || "";
+
+    if (isSnomedField && isEditing) {
+      return (
+        <SnomedSearchInput
+          key={fieldId}
+          label={label}
+          value={field.value}
+          conceptId={field.conceptId}
+          term={field.term}
+          onSelect={(result) =>
+            handleFieldChange(fieldId, {
+              value: result.value,
+              conceptId: result.conceptId,
+              term: result.term,
+              semanticTag: result.semanticTag,
+            })
+          }
+          editable={isEditing}
+          keyboardType={fieldType === "snomed-number" ? "numeric" : "default"}
+          placeholder={placeholder}
+          required={required}
+        />
+      );
+    }
+
+    if (isSnomedField && !isEditing) {
+      return (
+        <View key={fieldId} style={styles.staticField}>
+          <Text style={styles.label}>{label}</Text>
+          <View style={styles.staticValueContainer}>
+            <Text style={styles.staticValue}>{field.value || "-"}</Text>
+            {field.snomedVerified && (
+              <View style={styles.verifiedBadgeStatic}>
+                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                <Text style={styles.verifiedTextStatic}>SNOMED: {field.conceptId}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.paper}>
           {isReadOnly && (
-            <View
-              style={[styles.badgeContainer, isEditing && styles.badgeEditing]}
-            >
+            <View style={[styles.badgeContainer, isEditing && styles.badgeEditing]}>
               <Ionicons
                 name={isEditing ? "pencil" : "document-lock"}
                 size={16}
                 color={isEditing ? "#FF9800" : "#4CAF50"}
               />
-              <Text
-                style={[styles.badgeText, isEditing && { color: "#FF9800" }]}
-              >
-                {isEditing
-                  ? "MODO EDICIÓN ACTIVADO"
-                  : "DOCUMENTO CLÍNICO CERRADO"}
+              <Text style={[styles.badgeText, isEditing && { color: "#FF9800" }]}>
+                {isEditing ? "MODO EDICIÓN ACTIVADO" : "DOCUMENTO CLÍNICO CERRADO"}
               </Text>
             </View>
           )}
 
-          <Text style={styles.label}>Motivo de la visita</Text>
-          <TextInput
-            style={[
-              styles.input,
-              { minHeight: 80 },
-              !isEditing && styles.readOnlyInput,
-            ]}
-            multiline
-            value={reason}
-            onChangeText={setReason}
-            placeholder="Ej: Dolor de garganta..."
-            editable={isEditing}
-            showsVerticalScrollIndicator={false}
-          />
-
-          <View style={styles.row}>
-            <View style={styles.flex1}>
-              <Text style={styles.label}>Altura (cm)</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.readOnlyInput]}
-                keyboardType="numeric"
-                value={height}
-                onChangeText={setHeight}
-                editable={isEditing}
-              />
-            </View>
-            <View style={styles.spacer} />
-            <View style={styles.flex1}>
-              <Text style={styles.label}>Peso (kg)</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.readOnlyInput]}
-                keyboardType="numeric"
-                value={weight}
-                onChangeText={setWeight}
-                editable={isEditing}
-              />
-            </View>
-          </View>
-
-          <Text style={styles.label}>Pulso (ppm)</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.readOnlyInput]}
-            keyboardType="numeric"
-            value={pulse}
-            onChangeText={setPulse}
-            editable={isEditing}
-          />
+          {allFieldIds.map(renderField)}
         </View>
 
         {isEditing && (
           <View style={styles.actionContainer}>
             {isReadOnly && (
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setReason(data?.reasonForVisit || "");
-                  setHeight(data?.height?.toString() || "");
-                  setWeight(data?.weight?.toString() || "");
-                  setPulse(data?.pulse?.toString() || "");
-                  setIsEditing(false);
-                }}
-              >
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
             )}
@@ -236,7 +382,7 @@ export default function FormScreen({ route, navigation }) {
           </View>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -280,28 +426,34 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 15,
-    borderRadius: 12,
+  staticField: {
     marginBottom: 20,
-    fontSize: 16,
-    color: "#2C3E50",
   },
-  readOnlyInput: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    padding: 0,
-    marginBottom: 25,
+  staticValueContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  staticValue: {
     fontSize: 17,
     color: "#2C3E50",
     lineHeight: 24,
   },
-  row: { flexDirection: "row" },
-  flex1: { flex: 1 },
-  spacer: { width: 15 },
+  verifiedBadgeStatic: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  verifiedTextStatic: {
+    fontSize: 10,
+    color: "#4CAF50",
+    fontWeight: "600",
+    marginLeft: 4,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
   actionContainer: { gap: 12 },
   saveButton: {
     backgroundColor: "#4CAF50",
