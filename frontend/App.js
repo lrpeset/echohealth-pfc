@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 
 import HomeScreen from "./screens/HomeScreen";
 import HistoryScreen from "./screens/HistoryScreen";
+import FormEditorScreen from "./screens/FormEditorScreen";
 import RecordScreen from "./screens/RecordScreen";
 import FormScreen from "./screens/FormScreen";
 import LoginScreen from "./screens/LoginScreen";
@@ -25,6 +26,8 @@ function MainTabs() {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "HistoryTab") {
             iconName = focused ? "folder" : "folder-outline";
+          } else if (route.name === "ConfigTab") {
+            iconName = focused ? "construct" : "construct-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -43,6 +46,11 @@ function MainTabs() {
         name="HistoryTab"
         component={HistoryScreen}
         options={{ title: "Historial" }}
+      />
+      <Tab.Screen
+        name="ConfigTab"
+        component={FormEditorScreen}
+        options={{ title: "Editor" }}
       />
     </Tab.Navigator>
   );
