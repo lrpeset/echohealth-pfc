@@ -118,9 +118,7 @@ export default function RecordScreen({ navigation }) {
     let customConfig = [];
 
     if (template?.fields) {
-      customConfig = template.fields.filter(
-        (f) => f.conceptId && f.id !== "reasonForVisit"
-      );
+      customConfig = template.fields;
     }
 
     if (customConfig.length === 0) {
@@ -141,10 +139,8 @@ export default function RecordScreen({ navigation }) {
           const forms = await formsRes.json();
           const defaultForm = forms.find((f) => f.name === "Consulta General") || forms[0];
           if (defaultForm) {
-            templateName;
-            customConfig = (defaultForm.fields || []).filter(
-              (f) => f.conceptId && f.id !== "reasonForVisit"
-            );
+            templateName = defaultForm.name;
+            customConfig = (defaultForm.fields || []);
           }
         }
       } catch (_e) {}
@@ -161,17 +157,18 @@ export default function RecordScreen({ navigation }) {
       type: "audio/m4a",
     });
     customConfig.forEach((field) => {
-      if (field.term && field.conceptId) {
-        const system = field.terminology || "SNOMED";
-        formData.append("targetFields", `${field.conceptId}|${field.term}|${system}`);
-      }
+      const system = field.terminology || "SNOMED";
+      const conceptId = field.conceptId || "";
+      const term = field.term || "";
+      const fieldId = field.id || `custom_${conceptId.replace(/[^a-zA-Z0-9_]/g, "_")}` || "unknown";
+      const fieldLabel = field.label || term || fieldId || "unknown";
+      formData.append("targetFields", `${fieldId}|${fieldLabel}|${conceptId}|${term}|${system}`);
     });
 
     try {
       console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
       const targetFieldsLog = customConfig
-        .filter(f => f.term && f.conceptId)
-        .map(f => `${f.conceptId}|${f.term}|${f.terminology || "SNOMED"}`);
+        .map(f => `${f.id || "custom_" + (f.conceptId || "unknown").replace(/[^a-zA-Z0-9_]/g, "_")}|${f.label || f.term || f.id || "unknown"}|${f.conceptId || ""}|${f.term || ""}|${f.terminology || "SNOMED"}`);
       if (targetFieldsLog.length > 0) {
         console.log(`targetFields enviados: [${targetFieldsLog.join(", ")}]`);
       }
@@ -224,19 +221,44 @@ export default function RecordScreen({ navigation }) {
         } else {
           console.log("Datos clínicos extraídos exitosamente");
         }
+
+        if (result.redFlags && result.redFlags.length > 0) {
+          console.warn("Red flags clínicas detectadas por el backend:", result.redFlags);
+        }
       } else {
         console.warn("Formato legacy o inesperado recibido");
         console.warn("   keys:", Object.keys(result));
       }
 
       setIsProcessing(false);
-      Alert.alert(
-        "¡Audio Analizado!",
-        "La IA ha extraído los datos correctamente.",
-      );
 
-      console.log("Navegando a FormScreen con datos:", JSON.stringify({ data: result }, null, 2));
-      navigation.navigate("Form", { data: result });
+      if (result.redFlags && result.redFlags.length > 0) {
+        Alert.alert(
+          "⚠️ Alerta Clínica",
+          result.redFlags.join("\n\n"),
+          [
+            {
+              text: "Revisar",
+              style: "cancel",
+            },
+            {
+              text: "Continuar",
+              onPress: () => {
+                console.log("Navegando a FormScreen con red flags:", JSON.stringify({ data: result }, null, 2));
+                navigation.navigate("Form", { data: result });
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "¡Audio Analizado!",
+          "La IA ha extraído los datos correctamente.",
+        );
+
+        console.log("Navegando a FormScreen con datos:", JSON.stringify({ data: result }, null, 2));
+        navigation.navigate("Form", { data: result });
+      }
     } catch (error) {
       console.error("Error en el Fetch:", error);
       Alert.alert("Error", error.message || "No se pudo procesar el audio.");

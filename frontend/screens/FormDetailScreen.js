@@ -21,30 +21,71 @@ export default function FormDetailScreen({ route, navigation }) {
     fetchTemplate();
   }, [templateId]);
 
+  const handleDelete = () => {
+    Alert.alert(
+      "Eliminar plantilla",
+      "¿Estás seguro? Esta acción no se puede deshacer.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: confirmDelete },
+      ]
+    );
+  };
+
+  const confirmDelete = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await fetch(`${API_URL}/api/forms/${template.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        navigation.goBack();
+      } else if (response.status === 403) {
+        Alert.alert("Error", "Las plantillas de sistema no se pueden eliminar.");
+      } else {
+        Alert.alert("Error", "No se pudo eliminar la plantilla.");
+      }
+    } catch (e) {
+      console.error("Error deleting template:", e);
+      Alert.alert("Error", "No se pudo eliminar la plantilla.");
+    }
+  };
+
   useLayoutEffect(() => {
     if (template) {
       navigation.setOptions({
         title: template.name || "Plantilla",
         headerRight: () => (
-          <TouchableOpacity
-            onPress={() => {
-              if (template.userId === "system") {
-                Alert.alert(
-                  "Plantilla del sistema",
-                  "Crea una copia personal para poder editarla.",
-                  [
-                    { text: "Cancelar", style: "cancel" },
-                    { text: "Crear copia", onPress: handleCopyAndEdit },
-                  ]
-                );
-              } else {
-                navigation.navigate("FormEditor", { templateId: template.id });
-              }
-            }}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="create-outline" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {template.userId !== "system" && (
+              <TouchableOpacity
+                onPress={handleDelete}
+                style={{ marginRight: 12 }}
+              >
+                <Ionicons name="trash-outline" size={24} color="#FF5252" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                if (template.userId === "system") {
+                  Alert.alert(
+                    "Plantilla del sistema",
+                    "Crea una copia personal para poder editarla.",
+                    [
+                      { text: "Cancelar", style: "cancel" },
+                      { text: "Crear copia", onPress: handleCopyAndEdit },
+                    ]
+                  );
+                } else {
+                  navigation.navigate("FormEditor", { templateId: template.id });
+                }
+              }}
+              style={{ marginRight: 16 }}
+            >
+              <Ionicons name="create-outline" size={24} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
         ),
       });
     }
