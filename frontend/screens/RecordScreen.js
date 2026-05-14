@@ -162,13 +162,14 @@ export default function RecordScreen({ navigation }) {
       const term = field.term || "";
       const fieldId = field.id || `custom_${conceptId.replace(/[^a-zA-Z0-9_]/g, "_")}` || "unknown";
       const fieldLabel = field.label || term || fieldId || "unknown";
-      formData.append("targetFields", `${fieldId}|${fieldLabel}|${conceptId}|${term}|${system}`);
+      const fieldType = field.type || "snomed-text";
+      formData.append("targetFields", `${fieldId}|${fieldLabel}|${conceptId}|${term}|${system}|${fieldType}`);
     });
 
     try {
       console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
       const targetFieldsLog = customConfig
-        .map(f => `${f.id || "custom_" + (f.conceptId || "unknown").replace(/[^a-zA-Z0-9_]/g, "_")}|${f.label || f.term || f.id || "unknown"}|${f.conceptId || ""}|${f.term || ""}|${f.terminology || "SNOMED"}`);
+        .map(f => `${f.id || "custom_" + (f.conceptId || "unknown").replace(/[^a-zA-Z0-9_]/g, "_")}|${f.label || f.term || f.id || "unknown"}|${f.conceptId || ""}|${f.term || ""}|${f.terminology || "SNOMED"}|${f.type || "snomed-text"}`);
       if (targetFieldsLog.length > 0) {
         console.log(`targetFields enviados: [${targetFieldsLog.join(", ")}]`);
       }
