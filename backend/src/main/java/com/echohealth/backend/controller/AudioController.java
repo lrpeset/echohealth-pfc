@@ -36,7 +36,7 @@ public class AudioController {
      * estructurada con los fields extraídos y metadatos de procesamiento.
      *
      * @param file         Archivo de audio (multipart)
-     * @param targetFields Lista de strings en formato id|label|conceptId|term|system
+     * @param targetFields Lista de strings en formato id|label|conceptId|term|system|type
      * @return AudioUploadResponse con fields[] + metadata
      */
     @PostMapping("/upload")

@@ -106,120 +106,81 @@ public class ConsultationService {
         return fields;
     }
 
+    private static final Map<String, FieldMetadata> LEGACY_FIELD_METADATA = new HashMap<>();
+    static {
+        LEGACY_FIELD_METADATA.put("reasonForVisit", new FieldMetadata(
+                SnomedConstants.FieldDefaults.REASON_FOR_VISIT_ID,
+                SnomedConstants.FieldDefaults.REASON_FOR_VISIT_LABEL,
+                SnomedConstants.FieldDefaults.REASON_FOR_VISIT_TYPE, null, null, "SNOMED"));
+        LEGACY_FIELD_METADATA.put("category", new FieldMetadata("category", "Categoría", "text", null, null, "SNOMED"));
+        LEGACY_FIELD_METADATA.put("height", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.HEIGHT_ID,
+                ClinicalConstants.FieldDefaults.HEIGHT_LABEL,
+                ClinicalConstants.FieldDefaults.HEIGHT_TYPE,
+                ClinicalConstants.Concepts.HEIGHT, ClinicalConstants.Terms.HEIGHT, "LOINC"));
+        LEGACY_FIELD_METADATA.put("weight", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.WEIGHT_ID,
+                ClinicalConstants.FieldDefaults.WEIGHT_LABEL,
+                ClinicalConstants.FieldDefaults.WEIGHT_TYPE,
+                ClinicalConstants.Concepts.WEIGHT, ClinicalConstants.Terms.WEIGHT, "LOINC"));
+        LEGACY_FIELD_METADATA.put("pulse", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.PULSE_ID,
+                ClinicalConstants.FieldDefaults.PULSE_LABEL,
+                ClinicalConstants.FieldDefaults.PULSE_TYPE,
+                ClinicalConstants.Concepts.PULSE, ClinicalConstants.Terms.PULSE, "LOINC"));
+        LEGACY_FIELD_METADATA.put("bloodPressure", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_ID,
+                ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_LABEL,
+                ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_TYPE,
+                ClinicalConstants.Concepts.BLOOD_PRESSURE, ClinicalConstants.Terms.BLOOD_PRESSURE, "LOINC"));
+        LEGACY_FIELD_METADATA.put("oxygenSaturation", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_ID,
+                ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_LABEL,
+                ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_TYPE,
+                ClinicalConstants.Concepts.OXYGEN_SATURATION, ClinicalConstants.Terms.OXYGEN_SATURATION, "LOINC"));
+        LEGACY_FIELD_METADATA.put("painLocation", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.PAIN_LOCATION_ID,
+                ClinicalConstants.FieldDefaults.PAIN_LOCATION_LABEL,
+                ClinicalConstants.FieldDefaults.PAIN_LOCATION_TYPE,
+                ClinicalConstants.Concepts.PAIN_LOCATION, ClinicalConstants.Terms.PAIN_LOCATION, "LOINC"));
+        LEGACY_FIELD_METADATA.put("painNature", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.PAIN_NATURE_ID,
+                ClinicalConstants.FieldDefaults.PAIN_NATURE_LABEL,
+                ClinicalConstants.FieldDefaults.PAIN_NATURE_TYPE,
+                ClinicalConstants.Concepts.PAIN_NATURE, ClinicalConstants.Terms.PAIN_NATURE, "SNOMED"));
+        LEGACY_FIELD_METADATA.put("painIntensity", new FieldMetadata(
+                ClinicalConstants.FieldDefaults.PAIN_INTENSITY_ID,
+                ClinicalConstants.FieldDefaults.PAIN_INTENSITY_LABEL,
+                ClinicalConstants.FieldDefaults.PAIN_INTENSITY_TYPE,
+                ClinicalConstants.Concepts.PAIN_INTENSITY, ClinicalConstants.Terms.PAIN_INTENSITY, "LOINC"));
+    }
+
+    private record FieldMetadata(String id, String label, String type, String conceptId, String term, String terminology) {}
+
     private List<ConsultationField> convertLegacyToFields(Map<String, Object> content) {
         List<ConsultationField> fields = new ArrayList<>();
 
-        if (content.containsKey("reasonForVisit")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(SnomedConstants.FieldDefaults.REASON_FOR_VISIT_ID);
-            field.setLabel(SnomedConstants.FieldDefaults.REASON_FOR_VISIT_LABEL);
-            field.setType(SnomedConstants.FieldDefaults.REASON_FOR_VISIT_TYPE);
-            field.setValue(content.get("reasonForVisit"));
-            fields.add(field);
-        }
+        for (Map.Entry<String, Object> entry : content.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value == null) continue;
 
-        if (content.containsKey("category")) {
+            FieldMetadata meta = LEGACY_FIELD_METADATA.get(key);
             ConsultationField field = new ConsultationField();
-            field.setId("category");
-            field.setLabel("Categoría");
-            field.setType("text");
-            field.setValue(content.get("category"));
-            fields.add(field);
-        }
-
-        if (content.containsKey("height")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.HEIGHT_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.HEIGHT_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.HEIGHT_TYPE);
-            field.setValue(content.get("height"));
-            field.setConceptId(ClinicalConstants.Concepts.HEIGHT);
-            field.setTerm(ClinicalConstants.Terms.HEIGHT);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("weight")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.WEIGHT_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.WEIGHT_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.WEIGHT_TYPE);
-            field.setValue(content.get("weight"));
-            field.setConceptId(ClinicalConstants.Concepts.WEIGHT);
-            field.setTerm(ClinicalConstants.Terms.WEIGHT);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("pulse")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.PULSE_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.PULSE_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.PULSE_TYPE);
-            field.setValue(content.get("pulse"));
-            field.setConceptId(ClinicalConstants.Concepts.PULSE);
-            field.setTerm(ClinicalConstants.Terms.PULSE);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("bloodPressure")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.BLOOD_PRESSURE_TYPE);
-            field.setValue(content.get("bloodPressure"));
-            field.setConceptId(ClinicalConstants.Concepts.BLOOD_PRESSURE);
-            field.setTerm(ClinicalConstants.Terms.BLOOD_PRESSURE);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("oxygenSaturation")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_TYPE);
-            field.setValue(content.get("oxygenSaturation"));
-            field.setConceptId(ClinicalConstants.Concepts.OXYGEN_SATURATION);
-            field.setTerm(ClinicalConstants.Terms.OXYGEN_SATURATION);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("painLocation")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.PAIN_LOCATION_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.PAIN_LOCATION_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.PAIN_LOCATION_TYPE);
-            field.setValue(content.get("painLocation"));
-            field.setConceptId(ClinicalConstants.Concepts.PAIN_LOCATION);
-            field.setTerm(ClinicalConstants.Terms.PAIN_LOCATION);
-            field.setTerminology("LOINC");
-            fields.add(field);
-        }
-
-        if (content.containsKey("painNature")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.PAIN_NATURE_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.PAIN_NATURE_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.PAIN_NATURE_TYPE);
-            field.setValue(content.get("painNature"));
-            field.setConceptId(ClinicalConstants.Concepts.PAIN_NATURE);
-            field.setTerm(ClinicalConstants.Terms.PAIN_NATURE);
-            field.setTerminology("SNOMED");
-            fields.add(field);
-        }
-
-        if (content.containsKey("painIntensity")) {
-            ConsultationField field = new ConsultationField();
-            field.setId(ClinicalConstants.FieldDefaults.PAIN_INTENSITY_ID);
-            field.setLabel(ClinicalConstants.FieldDefaults.PAIN_INTENSITY_LABEL);
-            field.setType(ClinicalConstants.FieldDefaults.PAIN_INTENSITY_TYPE);
-            field.setValue(content.get("painIntensity"));
-            field.setConceptId(ClinicalConstants.Concepts.PAIN_INTENSITY);
-            field.setTerm(ClinicalConstants.Terms.PAIN_INTENSITY);
-            field.setTerminology("LOINC");
+            if (meta != null) {
+                field.setId(meta.id());
+                field.setLabel(meta.label());
+                field.setType(meta.type());
+                field.setConceptId(meta.conceptId());
+                field.setTerm(meta.term());
+                field.setTerminology(meta.terminology());
+            } else {
+                field.setId(key);
+                field.setLabel(key);
+                field.setType(value instanceof Number ? "loinc-number" : "snomed-text");
+                field.setTerminology("SNOMED");
+            }
+            field.setValue(value);
             fields.add(field);
         }
 

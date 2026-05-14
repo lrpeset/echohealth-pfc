@@ -98,9 +98,9 @@ public class GeminiService {
 
     /**
      * Record que representa un campo destino del formulario clínico.
-     * Se construye a partir del formato pipe-separado: id|label|conceptId|term|system
+     * Se construye a partir del formato pipe-separado: id|label|conceptId|term|system|type
      */
-    private record TargetField(String id, String label, String conceptId, String term, String system) {}
+    private record TargetField(String id, String label, String conceptId, String term, String system, String type) {}
 
     private record FieldInfo(String id, String label, String type, String conceptId, String term, String terminology) {}
 
@@ -209,14 +209,16 @@ public class GeminiService {
         List<FieldInfo> fields = new ArrayList<>();
 
         for (TargetField tf : customTargets) {
-            String type;
-            if ("LOINC".equals(tf.system())) {
-                String id = tf.id();
-                type = ("height".equals(id) || "weight".equals(id) || "pulse".equals(id)
-                        || "oxygenSaturation".equals(id) || "painIntensity".equals(id))
-                        ? "loinc-number" : "loinc-text";
-            } else {
-                type = "snomed-text";
+            String type = tf.type();
+            if (type == null || type.isEmpty()) {
+                if ("LOINC".equals(tf.system())) {
+                    String id = tf.id();
+                    type = ("height".equals(id) || "weight".equals(id) || "pulse".equals(id)
+                            || "oxygenSaturation".equals(id) || "painIntensity".equals(id))
+                            ? "loinc-number" : "loinc-text";
+                } else {
+                    type = "snomed-text";
+                }
             }
             String fieldId = (tf.id() != null && !tf.id().isEmpty())
                     ? tf.id()
@@ -230,22 +232,24 @@ public class GeminiService {
 
     /**
      * Parsea los targetFields recibidos como strings pipe-separados.
-     * Formato esperado: id|label|conceptId|term|system
-     * Si el formato tiene menos de 5 partes, intenta compatibilidad hacia atrás
-     * con el formato legacy (conceptId|term|system).
+     * Formato esperado: id|label|conceptId|term|system|type
+     * Si el formato tiene menos de 6 partes, intenta compatibilidad hacia atrás
+     * con formatos legacy (5 partes y 3 partes).
      */
     private List<TargetField> parseTargetFields(List<String> raw) {
         if (raw == null) return List.of();
         return raw.stream().map(s -> {
-            String[] parts = s.split("\\|", 5);
-            if (parts.length >= 5) {
-                return new TargetField(parts[0], parts[1], parts[2], parts[3], parts[4]);
+            String[] parts = s.split("\\|", 6);
+            if (parts.length >= 6) {
+                return new TargetField(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+            } else if (parts.length >= 5) {
+                return new TargetField(parts[0], parts[1], parts[2], parts[3], parts[4], null);
             } else if (parts.length >= 3) {
-                return new TargetField(null, null, parts[0], parts[1], parts[2]);
+                return new TargetField(null, null, parts[0], parts[1], parts[2], null);
             } else if (parts.length >= 2) {
-                return new TargetField(null, null, parts[0], parts[1], "SNOMED");
+                return new TargetField(null, null, parts[0], parts[1], "SNOMED", null);
             }
-            return new TargetField(null, null, parts[0], "", "SNOMED");
+            return new TargetField(null, null, parts[0], "", "SNOMED", null);
         }).collect(Collectors.toList());
     }
 
