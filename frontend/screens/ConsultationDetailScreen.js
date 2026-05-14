@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { API_URL } from "../config";
+import { buildFhirJson, buildFhirCsv } from "../utils/fhirExport";
 
 export default function ConsultationDetailScreen({ route, navigation }) {
   const { consultationId } = route.params;
@@ -93,8 +94,27 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       await Clipboard.setStringAsync(text);
       alert("Informe copiado al portapapeles");
     } catch (e) {
-      const prev = navigation.setOptions;
       alert("No se pudo copiar el texto");
+    }
+  };
+
+  const handleExportJson = async () => {
+    try {
+      const fields = consultation?.fields || [];
+      await Clipboard.setStringAsync(buildFhirJson(fields));
+      alert("JSON clínico copiado al portapapeles");
+    } catch (e) {
+      alert("No se pudo copiar el JSON");
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const fields = consultation?.fields || [];
+      await Clipboard.setStringAsync(buildFhirCsv(fields));
+      alert("CSV clínico copiado al portapapeles");
+    } catch (e) {
+      alert("No se pudo copiar el CSV");
     }
   };
 
@@ -223,6 +243,17 @@ export default function ConsultationDetailScreen({ route, navigation }) {
         <Ionicons name="copy-outline" size={20} color="#FFF" />
         <Text style={styles.copyButtonText}>Copiar Informe Médico</Text>
       </TouchableOpacity>
+
+      <View style={styles.exportRow}>
+        <TouchableOpacity style={styles.exportButtonJson} onPress={handleExportJson}>
+          <Ionicons name="code-slash-outline" size={18} color="#FFF" />
+          <Text style={styles.exportButtonText}>Exportar JSON (FHIR)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.exportButtonCsv} onPress={handleExportCsv}>
+          <Ionicons name="grid-outline" size={18} color="#FFF" />
+          <Text style={styles.exportButtonText}>Exportar CSV</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -454,6 +485,39 @@ const styles = StyleSheet.create({
   copyButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
+    fontWeight: "700",
+  },
+
+  exportRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  exportButtonJson: {
+    flex: 1,
+    backgroundColor: "#1565C0",
+    flexDirection: "row",
+    paddingVertical: 14,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  exportButtonCsv: {
+    flex: 1,
+    backgroundColor: "#2E7D32",
+    flexDirection: "row",
+    paddingVertical: 14,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  exportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "700",
   },
 });

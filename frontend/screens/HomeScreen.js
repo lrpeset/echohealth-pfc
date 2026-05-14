@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
+import { extractReasonForVisit } from "../utils/normalizeConsultation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function HomeScreen({ navigation }) {
@@ -72,14 +73,12 @@ export default function HomeScreen({ navigation }) {
   );
 
   const renderItem = ({ item }) => {
-    const content =
-      item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
+    const reason = extractReasonForVisit(item);
+    const category =
+      item.content?.category || item.category || null;
 
     const date = new Date(item.createdAt).toLocaleDateString("es-ES");
-    const iconData = getIconForConsultation(
-      content.reasonForVisit,
-      content.category,
-    );
+    const iconData = getIconForConsultation(reason, category);
 
     return (
       <TouchableOpacity
@@ -94,7 +93,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.textContainer}>
           <Text style={styles.cardDate}>{date}</Text>
           <Text style={styles.cardTitle} numberOfLines={1}>
-            {content.reasonForVisit || "Consulta sin motivo registrado"}
+            {reason || "Consulta sin motivo registrado"}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
