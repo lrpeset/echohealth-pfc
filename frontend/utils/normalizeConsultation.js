@@ -16,7 +16,7 @@
  *   result._normalized → true (flag para depuración)
  */
 
-const BASE_FIELD_DEFAULTS = {
+const METADATA_KNOWN_FIELDS = {
   reasonForVisit: {
     id: "reasonForVisit", label: "Motivo de la visita", type: "snomed-text",
     conceptId: null, term: null, terminology: "SNOMED", semanticTag: null, conceptVerified: false,
@@ -126,7 +126,7 @@ function normalizeField(f) {
   if (!f) return null;
 
   const id = f.id || "";
-  const defaults = BASE_FIELD_DEFAULTS[id];
+  const defaults = METADATA_KNOWN_FIELDS[id];
 
   return {
     id,
@@ -143,30 +143,24 @@ function normalizeField(f) {
 
 /**
  * Convierte un objeto plano legacy (clave → valor) a fields[] estructurados.
- * Los campos conocidos (reasonForVisit, height, weight, pulse) obtienen defaults.
- * Los campos desconocidos (claves extra) se mapean como custom con metadata genérica.
+ * Itera EXCLUSIVAMENTE sobre las claves que existen en el objeto plano.
+ * Usa METADATA_KNOWN_FIELDS solo para enriquecer metadatos si la clave es conocida;
+ * NUNCA inventa campos que no estén presentes en los datos.
  */
 function buildFieldsFromLegacy(flat) {
   const fields = [];
 
-  // Campos base conocidos
-  for (const [key, cfg] of Object.entries(BASE_FIELD_DEFAULTS)) {
-    if (flat[key] !== undefined) {
-      fields.push({
-        ...cfg,
-        value: flat[key] != null ? flat[key] : null,
-      });
-    }
-  }
-
-  // Campos extra (no base) — claves que no están en BASE_FIELD_DEFAULTS
-  const knownKeys = new Set(Object.keys(BASE_FIELD_DEFAULTS));
   for (const key of Object.keys(flat)) {
-    if (!knownKeys.has(key) && flat[key] != null) {
+    if (flat[key] == null) continue;
+
+    const known = METADATA_KNOWN_FIELDS[key];
+    if (known) {
+      fields.push({ ...known, value: flat[key] });
+    } else {
       fields.push({
         id: key,
         label: key,
-        type: "snomed-text",
+        type: flat[key] != null && !isNaN(Number(flat[key])) ? "loinc-number" : "snomed-text",
         value: flat[key],
         conceptId: null,
         term: null,
