@@ -64,15 +64,64 @@ export default function ConsultationDetailScreen({ route, navigation }) {
     return t.includes("red flag") || t.includes("alerta");
   };
 
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
+  if (!consultation) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color="#CFD8DC" />
+        <Text style={styles.errorText}>No se pudo cargar la consulta</Text>
+      </View>
+    );
+  }
+
+  if (!consultation?.fields || consultation.fields.length === 0) {
+    if (consultation.content && typeof consultation.content === "object") {
+      consultation.fields = Object.entries(consultation.content)
+        .filter(([, v]) => v != null)
+        .map(([key, value]) => ({
+          id: key,
+          label: key,
+          type: value != null && !isNaN(Number(value)) ? "loinc-number" : "snomed-text",
+          value,
+          conceptId: null,
+          term: null,
+          terminology: "SNOMED",
+          semanticTag: null,
+          conceptVerified: false,
+        }));
+    }
+  }
+
   const loincFields =
-    consultation?.fields?.filter((f) => f.terminology === "LOINC" && f.value != null) || [];
+    consultation.fields?.filter((f) => f.terminology === "LOINC" && f.value != null) || [];
   const snomedFields =
-    consultation?.fields?.filter(
+    consultation.fields?.filter(
       (f) => (f.terminology === "SNOMED" || !f.terminology) && f.value != null
     ) || [];
 
   const reasonField = snomedFields.find((f) => f.id === "reasonForVisit");
   const otherSnomedFields = snomedFields.filter((f) => f.id !== "reasonForVisit");
+
+  const hasRedFlag = [...loincFields, ...snomedFields].some(isRedFlag);
+
+  const renderTerminologyBadge = (field) => {
+    const isLoinc = field.terminology === "LOINC";
+    const color = isLoinc ? "#1565C0" : "#4CAF50";
+    const bgColor = isLoinc ? "#E3F2FD" : "#E8F5E9";
+    const label = isLoinc ? "LOINC" : "SNOMED";
+    return (
+      <View style={[styles.termBadge, { backgroundColor: bgColor }]}>
+        <Text style={[styles.termBadgeText, { color }]}>{label}</Text>
+      </View>
+    );
+  };
 
   const buildReportText = () => {
     const lines = [];
@@ -117,25 +166,6 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       alert("No se pudo copiar el CSV");
     }
   };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  if (!consultation) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={48} color="#CFD8DC" />
-        <Text style={styles.errorText}>No se pudo cargar la consulta</Text>
-      </View>
-    );
-  }
-
-  const hasRedFlag = [...loincFields, ...snomedFields].some(isRedFlag);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -197,9 +227,12 @@ export default function ConsultationDetailScreen({ route, navigation }) {
                   </View>
                   <Text style={styles.metricValue}>{String(field.value)}</Text>
                   <Text style={styles.metricLabel}>{field.label}</Text>
-                  {field.conceptId && (
-                    <Text style={styles.metricCode}>LOINC: {field.conceptId}</Text>
-                  )}
+                  <View style={styles.metricBadgeRow}>
+                    {renderTerminologyBadge(field)}
+                    {field.conceptId && (
+                      <Text style={styles.metricCode}>{field.terminology === "LOINC" ? "LOINC" : "SNOMED"}: {field.conceptId}</Text>
+                    )}
+                  </View>
                 </View>
               );
             })}
@@ -226,12 +259,13 @@ export default function ConsultationDetailScreen({ route, navigation }) {
                   <View style={styles.findingLeft}>
                     <Ionicons name="medical" size={16} color="#4CAF50" />
                     <Text style={styles.findingLabel}>{field.label}</Text>
+                    {renderTerminologyBadge(field)}
                   </View>
                   {flag && <Ionicons name="warning" size={18} color="#D32F2F" />}
                 </View>
                 <Text style={styles.findingValue}>{String(field.value)}</Text>
                 {field.conceptId && (
-                  <Text style={styles.findingCode}>SNOMED: {field.conceptId}</Text>
+                  <Text style={styles.findingCode}>{field.terminology === "LOINC" ? "LOINC" : "SNOMED"}: {field.conceptId}</Text>
                 )}
               </View>
             );
@@ -464,6 +498,25 @@ const styles = StyleSheet.create({
     color: "#90A4AE",
     marginTop: 6,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+
+  termBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  termBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
+  metricBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
   },
 
   redFlagCard: {

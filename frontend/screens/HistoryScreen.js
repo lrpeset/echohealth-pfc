@@ -70,11 +70,7 @@ export default function HistoryScreen({ navigation }) {
       <TouchableOpacity
         style={styles.card}
         onPress={() =>
-          navigation.navigate("Form", {
-            data: item,
-            isReadOnly: true,
-            consultationId: item.id,
-          })
+          navigation.navigate("ConsultationDetail", { consultationId: item.id })
         }
       >
         <View style={styles.iconContainer}>
