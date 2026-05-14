@@ -7,13 +7,43 @@ import { StatusBar } from "expo-status-bar";
 
 import HomeScreen from "./screens/HomeScreen";
 import HistoryScreen from "./screens/HistoryScreen";
+import FormListScreen from "./screens/FormListScreen";
+import FormDetailScreen from "./screens/FormDetailScreen";
 import FormEditorScreen from "./screens/FormEditorScreen";
 import RecordScreen from "./screens/RecordScreen";
 import FormScreen from "./screens/FormScreen";
+import ConsultationDetailScreen from "./screens/ConsultationDetailScreen";
 import LoginScreen from "./screens/LoginScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+function FormStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: "#F5F7FA" },
+        headerShadowVisible: false,
+      }}
+    >
+      <Stack.Screen
+        name="FormList"
+        component={FormListScreen}
+        options={{ title: "Mis Plantillas" }}
+      />
+      <Stack.Screen
+        name="FormDetail"
+        component={FormDetailScreen}
+        options={{ title: "Plantilla" }}
+      />
+      <Stack.Screen
+        name="FormEditor"
+        component={FormEditorScreen}
+        options={{ title: "Editor" }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 function MainTabs() {
   return (
@@ -26,8 +56,8 @@ function MainTabs() {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "HistoryTab") {
             iconName = focused ? "folder" : "folder-outline";
-          } else if (route.name === "ConfigTab") {
-            iconName = focused ? "construct" : "construct-outline";
+          } else if (route.name === "FormTab") {
+            iconName = focused ? "layers" : "layers-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -48,9 +78,9 @@ function MainTabs() {
         options={{ title: "Historial" }}
       />
       <Tab.Screen
-        name="ConfigTab"
-        component={FormEditorScreen}
-        options={{ title: "Editor" }}
+        name="FormTab"
+        component={FormStack}
+        options={{ title: "Formularios", headerShown: false }}
       />
     </Tab.Navigator>
   );
@@ -72,6 +102,17 @@ export default function App() {
           name="Main"
           component={MainTabs}
           options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="ConsultationDetail"
+          component={ConsultationDetailScreen}
+          options={{
+            title: "Detalle de Consulta",
+            headerStyle: { backgroundColor: "#2C3E50" },
+            headerTintColor: "#FFFFFF",
+            headerShadowVisible: false,
+          }}
         />
 
         <Stack.Group
