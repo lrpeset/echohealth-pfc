@@ -43,7 +43,7 @@ export default function FormListScreen({ navigation }) {
           conceptId: f.conceptId || null,
           term: f.term || null,
           semanticTag: f.semanticTag || null,
-          snomedVerified: f.snomedVerified || false,
+          conceptVerified: f.conceptVerified || false,
           terminology: f.terminology || "SNOMED",
           required: false,
           removable: true,

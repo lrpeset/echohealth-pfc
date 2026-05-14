@@ -70,21 +70,24 @@ export default function FormEditorScreen({ route, navigation }) {
     const isLoinc = system === "LOINC";
     const fieldType = isLoinc ? "loinc-text" : "snomed-text";
 
+    const cleanConceptId = result.conceptId.replace(/[^a-zA-Z0-9_]/g, "_");
+    const fieldId = `custom_${cleanConceptId}`;
+
     const newField = {
-      id: `custom_${Date.now()}`,
+      id: fieldId,
       label: result.term,
       type: fieldType,
       value: null,
       conceptId: result.conceptId,
       term: result.term,
       semanticTag: result.semanticTag || null,
-      snomedVerified: !isLoinc,
+      conceptVerified: !isLoinc,
       terminology: system,
       required: false,
       removable: true,
     };
 
-    console.log("Campo añadido con éxito:", newField);
+    console.log("Campo añadido con ID estable:", fieldId);
     setCustomFields((prev) => [...prev, newField]);
   };
 
@@ -104,7 +107,7 @@ export default function FormEditorScreen({ route, navigation }) {
         label: "Motivo de la visita",
         type: "snomed-text",
         conceptId: null, term: null, semanticTag: null,
-        snomedVerified: false, terminology: "SNOMED",
+        conceptVerified: false, terminology: "SNOMED",
         required: true, removable: false,
       },
       ...customFields.map((f) => ({
@@ -114,7 +117,7 @@ export default function FormEditorScreen({ route, navigation }) {
         conceptId: f.conceptId || null,
         term: f.term || null,
         semanticTag: f.semanticTag || null,
-        snomedVerified: f.snomedVerified || false,
+        conceptVerified: f.conceptVerified || false,
         terminology: f.terminology || "SNOMED",
         required: false,
         removable: true,

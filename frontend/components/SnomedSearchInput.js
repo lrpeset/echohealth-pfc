@@ -116,7 +116,6 @@ export default function SnomedSearchInput({
       value: item.term,
       conceptId: item.conceptId,
       term: item.term,
-      active: item.active,
       semanticTag: item.semanticTag || null,
       system: "SNOMED",
     });

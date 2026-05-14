@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getIconForConsultation } from "../utils/iconUtils";
+import { extractReasonForVisit } from "../utils/normalizeConsultation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function HistoryScreen({ navigation }) {
@@ -53,13 +54,11 @@ export default function HistoryScreen({ navigation }) {
   );
 
   const renderItem = ({ item }) => {
-    const content =
-      item.content || (item.contentJson ? JSON.parse(item.contentJson) : {});
+    const reason = extractReasonForVisit(item);
+    const category =
+      item.content?.category || item.category || null;
 
-    const iconData = getIconForConsultation(
-      content.reasonForVisit,
-      content.category,
-    );
+    const iconData = getIconForConsultation(reason, category);
     const dateObj = new Date(item.createdAt);
     const date = dateObj.toLocaleDateString("es-ES");
     const time = dateObj.toLocaleTimeString("es-ES", {
@@ -72,7 +71,7 @@ export default function HistoryScreen({ navigation }) {
         style={styles.card}
         onPress={() =>
           navigation.navigate("Form", {
-            data: content,
+            data: item,
             isReadOnly: true,
             consultationId: item.id,
           })
@@ -87,7 +86,7 @@ export default function HistoryScreen({ navigation }) {
             {date} - {time}
           </Text>
           <Text style={styles.cardTitle} numberOfLines={2}>
-            {content.reasonForVisit || "Sin motivo registrado"}
+            {reason || "Sin motivo registrado"}
           </Text>
         </View>
 
