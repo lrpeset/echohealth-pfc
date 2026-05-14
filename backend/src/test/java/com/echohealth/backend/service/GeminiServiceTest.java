@@ -426,6 +426,49 @@ class GeminiServiceTest {
     }
 
     @Test
+    void should_parse_6_part_format_with_type() {
+        List<String> raw = List.of(
+            "custom_8867_4|Frecuencia Cardíaca|8867-4|Heart rate|LOINC|loinc-number"
+        );
+
+        @SuppressWarnings("unchecked")
+        var parsed = (List<Object>) ReflectionTestUtils.invokeMethod(
+            service, "parseTargetFields", raw);
+
+        assertNotNull(parsed);
+        String parsedStr = parsed.toString();
+        assertTrue(parsedStr.contains("custom_8867_4"));
+        assertTrue(parsedStr.contains("Frecuencia Cardíaca"));
+        assertTrue(parsedStr.contains("8867-4"));
+        assertTrue(parsedStr.contains("Heart rate"));
+        assertTrue(parsedStr.contains("LOINC"));
+        assertTrue(parsedStr.contains("loinc-number"),
+            "El tipo debe propagarse desde el formato de 6 partes");
+    }
+
+    @Test
+    void should_use_type_from_target_fields_when_available() {
+        List<String> raw = List.of(
+            "custom_glucose|Glucosa|2345-7|Glucose|LOINC|loinc-number"
+        );
+
+        @SuppressWarnings("unchecked")
+        var parsed = (List<Object>) ReflectionTestUtils.invokeMethod(
+            service, "parseTargetFields", raw);
+
+        @SuppressWarnings("unchecked")
+        var fieldInfos = (List<Object>) ReflectionTestUtils.invokeMethod(
+            service, "buildAllFieldInfos", parsed);
+
+        assertNotNull(fieldInfos);
+        String infosStr = fieldInfos.toString();
+        assertTrue(infosStr.contains("loinc-number"),
+            "El tipo 'loinc-number' debe propagarse desde el targetField al FieldInfo");
+        assertTrue(infosStr.contains("custom_glucose"),
+            "El ID custom debe mantenerse");
+    }
+
+    @Test
     void should_fallback_to_legacy_3_part_format() {
         List<String> raw = List.of("21522001|Dolor abdominal|SNOMED");
 

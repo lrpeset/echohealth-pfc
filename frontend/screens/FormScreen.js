@@ -1,8 +1,7 @@
-import React, { useState, useRef, useLayoutEffect } from "react";
+import React, { useState, useLayoutEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -13,110 +12,42 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, MOCK_MODE } from "../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import SnomedSearchInput from "../components/SnomedSearchInput";
-import LoincSearchInput from "../components/LoincSearchInput";
+import ClinicalValueInput from "../components/ClinicalValueInput";
 import { normalizeConsultation } from "../utils/normalizeConsultation";
 
-const BASE_FIELD_CONFIG = [
-  {
-    id: "reasonForVisit",
-    label: "Motivo de la visita",
-    type: "snomed-text",
-    keyboardType: "default",
-    required: true,
-    placeholder: "Ej: Dolor de garganta, cefalea...",
-    defaultConceptId: null,
-    terminology: "SNOMED",
-  },
-  {
-    id: "height",
-    label: "Altura (cm)",
-    type: "loinc-number",
-    keyboardType: "numeric",
-    required: true,
-    placeholder: "175",
-    defaultConceptId: "8302-2",
-    defaultTerm: "Body height",
-    terminology: "LOINC",
-  },
-  {
-    id: "weight",
-    label: "Peso (kg)",
-    type: "loinc-number",
-    keyboardType: "numeric",
-    required: true,
-    placeholder: "72.5",
-    defaultConceptId: "29463-7",
-    defaultTerm: "Body weight",
-    terminology: "LOINC",
-  },
-  {
-    id: "pulse",
-    label: "Pulso (ppm)",
-    type: "loinc-number",
-    keyboardType: "numeric",
-    required: true,
-    placeholder: "72",
-    defaultConceptId: "8867-4",
-    defaultTerm: "Heart rate",
-    terminology: "LOINC",
-  },
-  {
-    id: "bloodPressure",
-    label: "Presión arterial (mmHg)",
-    type: "loinc-text",
-    keyboardType: "default",
-    required: false,
-    placeholder: "Ej: 120/80",
-    defaultConceptId: "85354-9",
-    defaultTerm: "Blood pressure panel",
-    terminology: "LOINC",
-  },
-  {
-    id: "oxygenSaturation",
-    label: "Saturación de oxígeno (%)",
-    type: "loinc-number",
-    keyboardType: "numeric",
-    required: false,
-    placeholder: "98",
-    defaultConceptId: "2708-6",
-    defaultTerm: "Oxygen saturation",
-    terminology: "LOINC",
-  },
-  {
-    id: "painLocation",
-    label: "Localización del dolor",
-    type: "snomed-text",
-    keyboardType: "default",
-    required: false,
-    placeholder: "Ej: Lumbar, cervical, abdominal...",
-    defaultConceptId: "70163-1",
-    defaultTerm: "Body site",
-    terminology: "LOINC",
-  },
-  {
-    id: "painNature",
-    label: "Naturaleza del dolor",
-    type: "snomed-text",
-    keyboardType: "default",
-    required: false,
-    placeholder: "Ej: Punzante, opresivo, quemante...",
-    defaultConceptId: "440751004",
-    defaultTerm: "Type of pain",
-    terminology: "SNOMED",
-  },
-  {
-    id: "painIntensity",
-    label: "Intensidad del dolor (0-10)",
-    type: "loinc-number",
-    keyboardType: "numeric",
-    required: false,
-    placeholder: "7",
-    defaultConceptId: "72514-3",
-    defaultTerm: "Pain severity - 0-10",
-    terminology: "LOINC",
-  },
-];
+function parseFieldRedFlags(redFlags) {
+  const flags = new Set();
+  if (!redFlags || !Array.isArray(redFlags)) return flags;
+  redFlags.forEach((msg) => {
+    if (msg.includes("Saturación")) flags.add("oxygenSaturation");
+    if (msg.includes("Taquicardia") || msg.includes("Bradicardia")) flags.add("pulse");
+    if (msg.includes("Presión arterial")) flags.add("bloodPressure");
+  });
+  return flags;
+}
+
+function buildInitialFields(normalizedData) {
+  const initial = {};
+  const normFields = normalizedData.fields || [];
+  normFields.forEach((fd) => {
+    initial[fd.id] = {
+      id: fd.id,
+      label: fd.label || fd.id,
+      type: fd.type || "snomed-text",
+      value: fd.value != null ? String(fd.value) : "",
+      conceptId: fd.conceptId || null,
+      term: fd.term || null,
+      semanticTag: fd.semanticTag || null,
+      conceptVerified: !!fd.conceptId,
+      terminology: fd.terminology || "SNOMED",
+    };
+  });
+  return initial;
+}
+
+function resetFields(normalizedData) {
+  return buildInitialFields(normalizedData);
+}
 
 export default function FormScreen({ route, navigation }) {
   const { data: rawData, isReadOnly = false, consultationId = null } = route.params;
@@ -125,46 +56,11 @@ export default function FormScreen({ route, navigation }) {
 
   const normalizedData = React.useMemo(() => normalizeConsultation(rawData), [rawData]);
 
-  const [clinicalFields, setClinicalFields] = useState(() => {
-    const initial = {};
-    const normFields = normalizedData.fields || [];
+  const [fields, setFields] = useState(() => buildInitialFields(normalizedData));
 
-    normFields.forEach((fd) => {
-      initial[fd.id] = {
-        value: fd.value ?? "",
-        conceptId: fd.conceptId || null,
-        term: fd.term || null,
-        type: fd.type || "snomed-text",
-        label: fd.label || "",
-        semanticTag: fd.semanticTag || null,
-        conceptVerified: !!fd.conceptId,
-        terminology: fd.terminology || "SNOMED",
-      };
-    });
+  const [fieldRedFlags] = useState(() => parseFieldRedFlags(normalizedData.redFlags));
 
-    BASE_FIELD_CONFIG.forEach((cfg) => {
-      if (!initial[cfg.id]) {
-        const legacyValue = normalizedData.content?.[cfg.id] ?? rawData?.[cfg.id];
-        initial[cfg.id] = {
-          value: legacyValue ?? "",
-          conceptId: cfg.defaultConceptId || null,
-          term: cfg.defaultTerm || null,
-          type: cfg.type,
-          label: cfg.label,
-          semanticTag: null,
-          conceptVerified: false,
-          terminology: cfg.terminology || "SNOMED",
-        };
-      } else {
-        initial[cfg.id].label = cfg.label;
-        initial[cfg.id].type = cfg.type;
-      }
-    });
-
-    return initial;
-  });
-
-  const fieldRefs = useRef({});
+  const allFieldIds = Object.keys(fields);
 
   useLayoutEffect(() => {
     if (isReadOnly && !isEditing) {
@@ -184,80 +80,58 @@ export default function FormScreen({ route, navigation }) {
     }
   }, [navigation, isReadOnly, isEditing]);
 
-  const getConfig = (fieldId) => BASE_FIELD_CONFIG.find((c) => c.id === fieldId);
-
-  const handleFieldChange = (fieldId, update) => {
-    setClinicalFields((prev) => ({
+  const handleFieldChange = (fieldId, newValue) => {
+    setFields((prev) => ({
       ...prev,
       [fieldId]: {
         ...prev[fieldId],
-        ...update,
-        conceptVerified: !!update.conceptId,
+        value: newValue,
       },
     }));
   };
 
-  const baseFieldIds = BASE_FIELD_CONFIG.map((c) => c.id);
-  const customFieldIds = Object.keys(clinicalFields).filter(
-    (id) => !baseFieldIds.includes(id)
-  );
-  const allFieldIds = [...baseFieldIds, ...customFieldIds];
-
   const hasChanges = () => {
-    const originalFields = normalizedData.fields || [];
-    return Object.keys(clinicalFields).some((fieldId) => {
-      const currentValue = clinicalFields[fieldId]?.value;
-      const originalField = originalFields.find((f) => f.id === fieldId);
-      const legacyValue = normalizedData.content?.[fieldId] ?? rawData?.[fieldId];
-      const originalValue = originalField?.value ?? legacyValue ?? "";
-      return String(currentValue) !== String(originalValue);
+    const original = normalizedData.fields || [];
+    return allFieldIds.some((fieldId) => {
+      const current = fields[fieldId];
+      const originalField = original.find((f) => f.id === fieldId);
+      const originalValue = originalField?.value != null ? String(originalField.value) : "";
+      return String(current.value) !== originalValue;
     });
   };
 
   const validateFields = () => {
-    for (const cfg of BASE_FIELD_CONFIG) {
-      const value = clinicalFields[cfg.id]?.value;
-      const fieldValue = value ?? "";
+    for (const fieldId of allFieldIds) {
+      const field = fields[fieldId];
+      const value = field.value;
+      const type = field.type || "snomed-text";
 
-      if (cfg.required) {
-        if (!fieldValue || (typeof fieldValue === "string" && !fieldValue.trim())) {
-          Alert.alert("Requerido", `El campo "${cfg.label}" es obligatorio.`);
-          return false;
-        }
-      }
-
-      if (!fieldValue || (typeof fieldValue === "string" && !fieldValue.trim())) {
+      if (!value || (typeof value === "string" && !value.trim())) {
         continue;
       }
 
-      const raw = typeof fieldValue === "string" ? fieldValue.trim() : String(fieldValue);
-
-      if (cfg.type === "loinc-number" || cfg.type === "snomed-number") {
-        const numValue = parseFloat(raw);
-        if (isNaN(numValue) || numValue < 0) {
-          Alert.alert("Inválido", `El campo "${cfg.label}" debe ser un número válido.`);
+      if (type.endsWith("-number")) {
+        const num = parseFloat(value);
+        if (isNaN(num)) {
+          Alert.alert("Inválido", `El campo "${field.label || fieldId}" debe ser un número válido.`);
           return false;
         }
-
-        if (cfg.id === "oxygenSaturation" && (numValue < 0 || numValue > 100)) {
-          Alert.alert("Fuera de rango", `La saturación de oxígeno debe estar entre 0% y 100%.`);
+        if (num < 0) {
+          Alert.alert("Inválido", `El campo "${field.label || fieldId}" no puede ser negativo.`);
           return false;
         }
-
-        if (cfg.id === "painIntensity" && (numValue < 0 || numValue > 10)) {
-          Alert.alert("Fuera de rango", `La intensidad del dolor debe estar entre 0 y 10.`);
+        if (fieldId === "oxygenSaturation" && num > 100) {
+          Alert.alert("Fuera de rango", "La saturación de oxígeno debe estar entre 0% y 100%.");
           return false;
         }
-
-        if (cfg.required && numValue <= 0) {
-          Alert.alert("Inválido", `El campo "${cfg.label}" debe ser un número positivo.`);
+        if (fieldId === "painIntensity" && num > 10) {
+          Alert.alert("Fuera de rango", "La intensidad del dolor debe estar entre 0 y 10.");
           return false;
         }
       }
 
-      if (cfg.id === "bloodPressure" && raw.length > 0) {
-        const bpRegex = /^\d{2,3}\/\d{2,3}$/;
-        if (!bpRegex.test(raw)) {
+      if (fieldId === "bloodPressure" && value.length > 0) {
+        if (!/^\d{2,3}\/\d{2,3}$/.test(value)) {
           Alert.alert("Formato inválido", "La presión arterial debe tener el formato: 120/80");
           return false;
         }
@@ -287,19 +161,20 @@ export default function FormScreen({ route, navigation }) {
   };
 
   const finalize = async () => {
-    const structuredFields = Object.entries(clinicalFields).map(
-      ([fieldId, field]) => ({
+    const structuredFields = allFieldIds.map((fieldId) => {
+      const field = fields[fieldId];
+      return {
         id: fieldId,
-        label: field.label,
-        type: field.type,
-        value: field.value,
+        label: field.label || fieldId,
+        type: field.type || "snomed-text",
+        value: field.value || null,
         conceptId: field.conceptId || null,
         term: field.term || null,
         semanticTag: field.semanticTag || null,
-        conceptVerified: field.conceptVerified,
+        conceptVerified: !!field.conceptId,
         terminology: field.terminology || "SNOMED",
-      })
-    );
+      };
+    });
 
     const payload = {
       fields: structuredFields,
@@ -318,7 +193,6 @@ export default function FormScreen({ route, navigation }) {
       : `${API_URL}/api/consultations`;
 
     try {
-      console.log(`Enviando petición ${method} a: ${endpoint}`);
       const token = await AsyncStorage.getItem("userToken");
       const response = await fetch(endpoint, {
         method,
@@ -337,104 +211,48 @@ export default function FormScreen({ route, navigation }) {
         [{ text: "OK", onPress: () => navigation.popToTop() }]
       );
     } catch (error) {
-      console.error("Error al guardar:", error);
       Alert.alert("Error", "No se pudo conectar con el servidor.");
     }
   };
 
   const handleCancel = () => {
-    const reset = {};
-    const normFields = normalizedData.fields || [];
-    normFields.forEach((fd) => {
-      reset[fd.id] = {
-        value: fd.value ?? "",
-        conceptId: fd.conceptId || null,
-        term: fd.term || null,
-        type: fd.type || "snomed-text",
-        label: fd.label || "",
-        semanticTag: fd.semanticTag || null,
-        conceptVerified: !!fd.conceptId,
-        terminology: fd.terminology || "SNOMED",
-      };
-    });
-    BASE_FIELD_CONFIG.forEach((cfg) => {
-      if (!reset[cfg.id]) {
-        const legacyValue = normalizedData.content?.[cfg.id] ?? rawData?.[cfg.id];
-        reset[cfg.id] = {
-          value: legacyValue ?? "",
-          conceptId: cfg.defaultConceptId || null,
-          term: cfg.defaultTerm || null,
-          type: cfg.type,
-          label: cfg.label,
-          semanticTag: null,
-          conceptVerified: !!cfg.defaultConceptId,
-        };
-      }
-    });
-    setClinicalFields(reset);
+    setFields(resetFields(normalizedData));
     setIsEditing(false);
   };
 
   const renderField = (fieldId) => {
-    const field = clinicalFields[fieldId];
+    const field = fields[fieldId];
     if (!field) return null;
 
-    const cfg = getConfig(fieldId);
-    const label = cfg?.label || field.label || fieldId;
-    const fieldType = cfg?.type || field.type || "snomed-text";
-    const isTerminologyField = fieldType.startsWith("snomed-") || fieldType.startsWith("loinc-");
-    const terminology = field.terminology || (fieldType.startsWith("loinc-") ? "LOINC" : "SNOMED");
-    const required = cfg?.required || false;
-    const placeholder = cfg?.placeholder || "";
-
-    if (isTerminologyField && isEditing) {
-      const SearchComponent = terminology === "LOINC" ? LoincSearchInput : SnomedSearchInput;
-      return (
-        <SearchComponent
-          key={fieldId}
-          label={label}
-          value={field.value}
-          conceptId={field.conceptId}
-          term={field.term}
-          onSelect={(result) =>
-            handleFieldChange(fieldId, {
-              value: result.value,
-              conceptId: result.conceptId,
-              term: result.term,
-              semanticTag: result.semanticTag,
-              terminology: result.system || terminology,
-            })
-          }
-          editable={isEditing}
-          keyboardType={fieldType === "snomed-number" || fieldType === "loinc-number" ? "numeric" : "default"}
-          placeholder={placeholder}
-          required={required}
-        />
-      );
-    }
-
-    if (isTerminologyField && !isEditing) {
-      const isLoinc = terminology === "LOINC";
-      return (
-        <View key={fieldId} style={styles.staticField}>
-          <Text style={styles.label}>{label}</Text>
-          <View style={styles.staticValueContainer}>
-            <Text style={styles.staticValue}>{field.value || "-"}</Text>
-            {field.conceptId && (
-              <View style={isLoinc ? styles.verifiedBadgeStaticLoinc : styles.verifiedBadgeStatic}>
-                <Ionicons name="checkmark-circle" size={14} color={isLoinc ? "#1565C0" : "#4CAF50"} />
-                <Text style={[styles.verifiedTextStatic, isLoinc && { color: "#1565C0" }]}>
-                  {terminology}: {field.conceptId}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    return null;
+    return (
+      <ClinicalValueInput
+        key={fieldId}
+        label={field.label || fieldId}
+        value={field.value}
+        type={field.type || "snomed-text"}
+        conceptId={field.conceptId || null}
+        term={field.term || null}
+        terminology={field.terminology || "SNOMED"}
+        onChange={(newValue) => handleFieldChange(fieldId, newValue)}
+        editable={isEditing}
+        placeholder=""
+        redFlag={fieldRedFlags.has(fieldId)}
+        fieldId={fieldId}
+      />
+    );
   };
+
+  if (allFieldIds.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="document-text-outline" size={48} color="#CBD5E1" />
+        <Text style={styles.emptyTitle}>Sin campos</Text>
+        <Text style={styles.emptySubtitle}>
+          No se recibieron campos de la plantilla seleccionada.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -522,49 +340,6 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     marginLeft: 6,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#7F8C8D",
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  staticField: {
-    marginBottom: 20,
-  },
-  staticValueContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  staticValue: {
-    fontSize: 17,
-    color: "#2C3E50",
-    lineHeight: 24,
-  },
-  verifiedBadgeStatic: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E8F5E9",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  verifiedBadgeStaticLoinc: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E3F2FD",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  verifiedTextStatic: {
-    fontSize: 10,
-    color: "#4CAF50",
-    fontWeight: "600",
-    marginLeft: 4,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
   actionContainer: { gap: 12 },
   saveButton: {
     backgroundColor: "#4CAF50",
@@ -590,4 +365,24 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
   cancelButtonText: { color: "#7F8C8D", fontSize: 16, fontWeight: "bold" },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F7FA",
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2C3E50",
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+  },
 });
