@@ -59,9 +59,7 @@ public class FormTemplateController {
     public ResponseEntity<Void> delete(@PathVariable String id, Principal principal) {
         String userId = principal.getName();
         log.info("Deleting form template {} for user {}", id, userId);
-        if (service.delete(id, userId)) {
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
+        service.delete(id, userId);
+        return ResponseEntity.noContent().build();
     }
 }

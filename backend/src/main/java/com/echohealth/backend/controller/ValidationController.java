@@ -101,7 +101,7 @@ public class ValidationController {
         loincField.setType("loinc-text");
         loincField.setConceptId("85354-9");
         loincField.setTerm("Blood pressure panel");
-        loincField.setSnomedVerified(false);
+        loincField.setConceptVerified(false);
         loincField.setTerminology("LOINC");
         loincField.setRequired(false);
         loincField.setRemovable(true);
@@ -115,7 +115,7 @@ public class ValidationController {
         snomedField.setConceptId("21522001");
         snomedField.setTerm("Dolor abdominal");
         snomedField.setSemanticTag("finding");
-        snomedField.setSnomedVerified(true);
+        snomedField.setConceptVerified(true);
         snomedField.setTerminology("SNOMED");
         snomedField.setRequired(false);
         snomedField.setRemovable(true);

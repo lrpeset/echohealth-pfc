@@ -24,6 +24,8 @@ public class FormTemplate {
 
     private List<FormTemplateField> fields;
 
+    private boolean isDefault;
+
     public FormTemplate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -47,6 +49,9 @@ public class FormTemplate {
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
+    public boolean isDefault() { return isDefault; }
+    public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
+
     public List<FormTemplateField> getFields() { return fields; }
     public void setFields(List<FormTemplateField> fields) { this.fields = fields; }
 
@@ -58,7 +63,7 @@ public class FormTemplate {
         private String conceptId;
         private String term;
         private String semanticTag;
-        private boolean snomedVerified;
+        private boolean conceptVerified;
         private String terminology;
         private boolean required;
         private boolean removable;
@@ -83,8 +88,8 @@ public class FormTemplate {
         public String getSemanticTag() { return semanticTag; }
         public void setSemanticTag(String semanticTag) { this.semanticTag = semanticTag; }
 
-        public boolean isSnomedVerified() { return snomedVerified; }
-        public void setSnomedVerified(boolean snomedVerified) { this.snomedVerified = snomedVerified; }
+        public boolean isConceptVerified() { return conceptVerified; }
+        public void setConceptVerified(boolean conceptVerified) { this.conceptVerified = conceptVerified; }
 
         public String getTerminology() { return terminology; }
         public void setTerminology(String terminology) { this.terminology = terminology; }

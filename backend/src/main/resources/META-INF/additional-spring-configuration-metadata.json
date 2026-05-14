@@ -23,5 +23,15 @@
     "name": "snomed.base-url",
     "type": "java.lang.String",
     "description": "A description for 'snomed.base-url'"
+  },
+  {
+    "name": "loinc.fhir-base-url",
+    "type": "java.lang.String",
+    "description": "A description for 'loinc.fhir-base-url'"
+  }
+  ,{
+    "name": "snomed.fhir-base-url",
+    "type": "java.lang.String",
+    "description": "A description for 'snomed.fhir-base-url'"
   }
 ]}
