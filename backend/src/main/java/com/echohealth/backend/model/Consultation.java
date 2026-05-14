@@ -54,10 +54,18 @@ public class Consultation {
         
         private boolean snomedVerified;
 
+        private String terminology = "SNOMED";
+
         public ConsultationField() {}
 
         public ConsultationField(String id, String label, String type, Object value, 
                                 String conceptId, String term, String semanticTag, boolean snomedVerified) {
+            this(id, label, type, value, conceptId, term, semanticTag, snomedVerified, "SNOMED");
+        }
+
+        public ConsultationField(String id, String label, String type, Object value, 
+                                String conceptId, String term, String semanticTag, boolean snomedVerified,
+                                String terminology) {
             this.id = id;
             this.label = label;
             this.type = type;
@@ -66,6 +74,7 @@ public class Consultation {
             this.term = term;
             this.semanticTag = semanticTag;
             this.snomedVerified = snomedVerified;
+            this.terminology = terminology != null ? terminology : "SNOMED";
         }
 
         public String getId() { return id; }
@@ -91,5 +100,8 @@ public class Consultation {
         
         public boolean isSnomedVerified() { return snomedVerified; }
         public void setSnomedVerified(boolean snomedVerified) { this.snomedVerified = snomedVerified; }
+
+        public String getTerminology() { return terminology; }
+        public void setTerminology(String terminology) { this.terminology = terminology != null ? terminology : "SNOMED"; }
     }
 }

@@ -32,6 +32,7 @@ public class ConsultationService {
         return repository.findById(id);
     }
 
+    @SuppressWarnings("deprecation")
     public Consultation save(Map<String, Object> payload, String userId) {
         Consultation consultation = new Consultation();
         consultation.setUserId(userId);
@@ -56,6 +57,7 @@ public class ConsultationService {
         return repository.save(consultation);
     }
 
+    @SuppressWarnings("deprecation")
     public Optional<Consultation> update(String id, Map<String, Object> newPayload, String userId) {
         return repository.findById(id)
                 .filter(c -> c.getUserId().equals(userId))
@@ -96,6 +98,7 @@ public class ConsultationService {
             field.setSemanticTag((String) fieldData.get("semanticTag"));
             field.setSnomedVerified(fieldData.get("snomedVerified") != null 
                     && (Boolean) fieldData.get("snomedVerified"));
+            field.setTerminology((String) fieldData.get("terminology"));
             fields.add(field);
         }
 
