@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { API_URL, MOCK_MODE } from "../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import SnomedSearchInput from "../components/SnomedSearchInput";
+import LoincSearchInput from "../components/LoincSearchInput";
 
 const BASE_FIELD_CONFIG = [
   {
@@ -75,6 +76,7 @@ export default function FormScreen({ route, navigation }) {
           label: fd.label || "",
           semanticTag: fd.semanticTag || null,
           snomedVerified: !!fd.conceptId,
+          terminology: fd.terminology || "SNOMED",
         };
       });
     }
@@ -90,6 +92,7 @@ export default function FormScreen({ route, navigation }) {
           label: cfg.label,
           semanticTag: null,
           snomedVerified: !!cfg.defaultConceptId,
+          terminology: "SNOMED",
         };
       } else {
         initial[cfg.id].label = cfg.label;
@@ -201,6 +204,7 @@ export default function FormScreen({ route, navigation }) {
         term: field.term || null,
         semanticTag: field.semanticTag || null,
         snomedVerified: field.snomedVerified,
+        terminology: field.terminology || (field.type && field.type.startsWith("loinc-") ? "LOINC" : "SNOMED"),
       })
     );
 
@@ -257,6 +261,7 @@ export default function FormScreen({ route, navigation }) {
           label: fd.label || "",
           semanticTag: fd.semanticTag || null,
           snomedVerified: !!fd.conceptId,
+          terminology: fd.terminology || "SNOMED",
         };
       });
     }
@@ -285,13 +290,15 @@ export default function FormScreen({ route, navigation }) {
     const cfg = getConfig(fieldId);
     const label = cfg?.label || field.label || fieldId;
     const fieldType = cfg?.type || field.type || "snomed-text";
-    const isSnomedField = fieldType.startsWith("snomed-");
+    const isTerminologyField = fieldType.startsWith("snomed-") || fieldType.startsWith("loinc-");
+    const terminology = field.terminology || (fieldType.startsWith("loinc-") ? "LOINC" : "SNOMED");
     const required = cfg?.required || false;
     const placeholder = cfg?.placeholder || "";
 
-    if (isSnomedField && isEditing) {
+    if (isTerminologyField && isEditing) {
+      const SearchComponent = terminology === "LOINC" ? LoincSearchInput : SnomedSearchInput;
       return (
-        <SnomedSearchInput
+        <SearchComponent
           key={fieldId}
           label={label}
           value={field.value}
@@ -303,26 +310,30 @@ export default function FormScreen({ route, navigation }) {
               conceptId: result.conceptId,
               term: result.term,
               semanticTag: result.semanticTag,
+              terminology: result.system || terminology,
             })
           }
           editable={isEditing}
-          keyboardType={fieldType === "snomed-number" ? "numeric" : "default"}
+          keyboardType={fieldType === "snomed-number" || fieldType === "loinc-number" ? "numeric" : "default"}
           placeholder={placeholder}
           required={required}
         />
       );
     }
 
-    if (isSnomedField && !isEditing) {
+    if (isTerminologyField && !isEditing) {
+      const isLoinc = terminology === "LOINC";
       return (
         <View key={fieldId} style={styles.staticField}>
           <Text style={styles.label}>{label}</Text>
           <View style={styles.staticValueContainer}>
             <Text style={styles.staticValue}>{field.value || "-"}</Text>
-            {field.snomedVerified && (
-              <View style={styles.verifiedBadgeStatic}>
-                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-                <Text style={styles.verifiedTextStatic}>SNOMED: {field.conceptId}</Text>
+            {field.conceptId && (
+              <View style={isLoinc ? styles.verifiedBadgeStaticLoinc : styles.verifiedBadgeStatic}>
+                <Ionicons name="checkmark-circle" size={14} color={isLoinc ? "#1565C0" : "#4CAF50"} />
+                <Text style={[styles.verifiedTextStatic, isLoinc && { color: "#1565C0" }]}>
+                  {terminology}: {field.conceptId}
+                </Text>
               </View>
             )}
           </View>
@@ -443,6 +454,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#E8F5E9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  verifiedBadgeStaticLoinc: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E3F2FD",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
