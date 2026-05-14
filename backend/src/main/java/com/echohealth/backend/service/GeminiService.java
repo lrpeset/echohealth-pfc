@@ -1,6 +1,5 @@
 package com.echohealth.backend.service;
 
-import com.echohealth.backend.util.SnomedConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,122 +37,94 @@ public class GeminiService {
     private String buildMedicalPrompt(List<String> targetFields) {
         List<TargetField> parsed = parseTargetFields(targetFields);
 
-        String basePrompt = String.format("""
-        Act as an expert Medical Scribe specialized in SNOMED CT terminology mapping.
-        Extract clinical data from the consultation audio and return a structured JSON array.
-        
-        FIELD MAPPING (MUST FOLLOW THESE IDs):
-        - "reasonForVisit": Clinical summary/primary complaint
-        - "height": Body height in CENTIMETERS (convert ft/in to cm if needed)
-        - "weight": Body weight in KILOGRAMS (convert lbs to kg if needed)  
-        - "pulse": Heart rate in beats per minute (bpm)
-        
-        SNOMED CT CODES (use these exact codes):
-        - Height: %s (%s)
-        - Weight: %s (%s)
-        - Pulse: %s (%s)
-        
-        ANONYMIZATION: NEVER include patient names, personal identifiers, or specific dates.
-        
-        OUTPUT FORMAT (Strict JSON Array):
-        [
-          {
-            "id": "reasonForVisit",
-            "label": "Motivo de la visita",
-            "type": "snomed-text",
-            "value": "string or null",
-            "conceptId": "SNOMED code or null",
-            "term": "SNOMED term or null",
-            "snomedVerified": boolean
-          },
-          {
-            "id": "height",
-            "label": "Altura (cm)", 
-            "type": "snomed-number",
-            "value": number or null,
-            "conceptId": "%s",
-            "term": "%s",
-            "snomedVerified": boolean
-          },
-          {
-            "id": "weight",
-            "label": "Peso (kg)",
-            "type": "snomed-number",
-            "value": number or null,
-            "conceptId": "%s", 
-            "term": "%s",
-            "snomedVerified": boolean
-          },
-          {
-            "id": "pulse",
-            "label": "Pulso (ppm)",
-            "type": "snomed-number",
-            "value": number or null,
-            "conceptId": "%s",
-            "term": "%s",
-            "snomedVerified": boolean
-          }
-        ]
-        
-        RULES:
-        1. Always include the 4 base fields above AND any additional targetFields provided below
-        2. If a value cannot be extracted from audio, use null for value
-        3. Set snomedVerified to true ONLY if you are confident in the mapping
-        4. Convert units: feet->cm (x30.48), inches->cm (x2.54), lbs->kg (x0.453592)
-        5. Return valid JSON only, no additional text
-        """,
-            SnomedConstants.Concepts.HEIGHT, SnomedConstants.Terms.HEIGHT,
-            SnomedConstants.Concepts.WEIGHT, SnomedConstants.Terms.WEIGHT,
-            SnomedConstants.Concepts.PULSE, SnomedConstants.Terms.PULSE,
-            SnomedConstants.Concepts.HEIGHT, SnomedConstants.Terms.HEIGHT,
-            SnomedConstants.Concepts.WEIGHT, SnomedConstants.Terms.WEIGHT,
-            SnomedConstants.Concepts.PULSE, SnomedConstants.Terms.PULSE
-        );
+        List<FieldInfo> allFields = buildAllFieldInfos(parsed);
 
-        if (!parsed.isEmpty()) {
-            String customFieldsSection = parsed.stream()
-                    .map(tf -> String.format("""
+        String fieldTable = allFields.stream()
+                .map(f -> String.format(
+                        "  - Campo: \"%s\" | Formato: %s | Terminología: %s | Código Sugerido: %s",
+                        f.label, f.type, f.terminology, f.conceptId != null ? f.conceptId : "N/A"))
+                .collect(Collectors.joining("\n"));
+
+        String jsonTemplate = allFields.stream()
+                .map(f -> {
+                    boolean isLoinc = "LOINC".equals(f.terminology);
+                    boolean isNumeric = f.type != null && f.type.endsWith("-number");
+                    String valueType = isNumeric ? "number or null" : "string or null";
+                    String conceptIdStr = f.conceptId != null ? "\"" + f.conceptId + "\"" : "null";
+                    String termStr = f.term != null ? "\"" + f.term + "\"" : "null";
+                    String snomedVerified = isLoinc ? "false" : "boolean";
+                    return String.format("""
           {
-            "id": "custom_%s",
+            "id": "%s",
             "label": "%s",
-            "type": "snomed-text",
-            "value": "string or null",
-            "conceptId": "%s",
-            "term": "%s",
-            "snomedVerified": true
-          }""", sanitizeFieldId(tf.term()), tf.term(), tf.conceptId(), tf.term()))
-                    .collect(Collectors.joining(",\n"));
+            "type": "%s",
+            "value": %s,
+            "conceptId": %s,
+            "term": %s,
+            "snomedVerified": %s,
+            "terminology": "%s"
+          }""", f.id, f.label, f.type, valueType, conceptIdStr, termStr, snomedVerified, f.terminology);
+                })
+                .collect(Collectors.joining(",\n"));
 
-            String dynamicInstruction = String.format(
-                "\n\nADDITIONAL REQUIRED FIELDS (conceptId PROVIDED — do NOT guess):\n" +
-                "In addition to the 4 standard fields above, you MUST also extract and include\n" +
-                "these clinical concepts in the output array. Use the exact conceptId provided:\n%s\n\n" +
-                "RULE 6: Append these additional field objects after the 4 standard ones.\n" +
-                "RULE 7: If a concept is not mentioned in the audio, set value to null but KEEP the conceptId.",
+        return String.format("""
+        Act as an expert Medical Scribe specialized in international clinical coding (SNOMED CT and LOINC).
+        Extract clinical data from the consultation audio and return a structured JSON array.
 
-                parsed.stream()
-                        .map(tf -> "- \"" + tf.term() + "\" (conceptId: " + tf.conceptId() + ")")
-                        .collect(Collectors.joining("\n"))
-            );
+        The consultation form has the following fields. For each field, use the exact format, terminology,
+        and suggested code provided below.
 
-            basePrompt += dynamicInstruction;
+        FIELD DEFINITIONS:
+        %s
+
+        ANONYMIZATION: NEVER include patient names, personal identifiers, or specific dates.
+
+        OUTPUT FORMAT (Strict JSON Array — follow this exact structure for every field):
+        [
+        %s
+        ]
+
+        RULES:
+        1. Include EVERY field listed above in the output array, in the order shown.
+        2. If a value cannot be extracted from audio, use null for value but KEEP all other metadata (conceptId, term, terminology).
+        3. Set snomedVerified to true ONLY if terminology is SNOMED and you are confident in the mapping.
+        4. Convert units: feet->cm (x30.48), inches->cm (x2.54), lbs->kg (x0.453592).
+        5. Return valid JSON only, no additional text.
+        6. Use the EXACT conceptId, term, type, and terminology specified for each field. Do NOT guess or substitute codes.
+        """, fieldTable, jsonTemplate);
+    }
+
+    private List<FieldInfo> buildAllFieldInfos(List<TargetField> customFields) {
+        List<FieldInfo> fields = new java.util.ArrayList<>();
+
+        fields.add(new FieldInfo("reasonForVisit", "Motivo de la visita", "snomed-text", null, null, "SNOMED"));
+        fields.add(new FieldInfo("height", "Altura (cm)", "loinc-number", "8302-2", "Body height", "LOINC"));
+        fields.add(new FieldInfo("weight", "Peso (kg)", "loinc-number", "29463-7", "Body weight", "LOINC"));
+        fields.add(new FieldInfo("pulse", "Pulso (ppm)", "loinc-number", "8867-4", "Heart rate", "LOINC"));
+
+        for (TargetField tf : customFields) {
+            String type = "LOINC".equals(tf.system()) ? "loinc-text" : "snomed-text";
+            String fieldId = "custom_" + sanitizeFieldId(tf.term());
+            fields.add(new FieldInfo(fieldId, tf.term(), type, tf.conceptId(), tf.term(), tf.system()));
         }
 
-        return basePrompt;
+        return fields;
     }
+
+    private record FieldInfo(String id, String label, String type, String conceptId, String term, String terminology) {}
 
     private List<TargetField> parseTargetFields(List<String> raw) {
         if (raw == null) return List.of();
         return raw.stream().map(s -> {
-            int sep = s.indexOf('|');
-            if (sep > 0) {
-                return new TargetField(s.substring(0, sep), s.substring(sep + 1));
-            }
-            return new TargetField(null, s);
+            String[] parts = s.split("\\|", 3);
+            String conceptId = parts.length > 0 && !parts[0].isEmpty() ? parts[0] : null;
+            String term = parts.length > 1 ? parts[1] : "";
+            String system = parts.length > 2 ? parts[2] : "SNOMED";
+            return new TargetField(conceptId, term, system);
         }).collect(Collectors.toList());
     }
 
-    private record TargetField(String conceptId, String term) {}
+    private record TargetField(String conceptId, String term, String system) {}
 
     private String sanitizeFieldId(String term) {
         return term.toLowerCase().replaceAll("[^a-z0-9]", "_").replaceAll("_+", "_");
@@ -299,32 +270,27 @@ public class GeminiService {
     private String buildFallbackResponse(List<String> targetFields) {
         log.warn("Devolviendo respuesta de fallback con campos vacíos");
         List<TargetField> parsed = parseTargetFields(targetFields);
+        List<FieldInfo> allFields = buildAllFieldInfos(parsed);
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("""
-            [
-              {"id": "reasonForVisit", "label": "Motivo de la visita", "type": "snomed-text", "value": null, "conceptId": null, "term": null, "snomedVerified": false},
-              {"id": "height", "label": "Altura (cm)", "type": "snomed-number", "value": null, "conceptId": "%s", "term": "%s", "snomedVerified": false},
-              {"id": "weight", "label": "Peso (kg)", "type": "snomed-number", "value": null, "conceptId": "%s", "term": "%s", "snomedVerified": false},
-              {"id": "pulse", "label": "Pulso (ppm)", "type": "snomed-number", "value": null, "conceptId": "%s", "term": "%s", "snomedVerified": false}
-            """,
-            SnomedConstants.Concepts.HEIGHT, SnomedConstants.Terms.HEIGHT,
-            SnomedConstants.Concepts.WEIGHT, SnomedConstants.Terms.WEIGHT,
-            SnomedConstants.Concepts.PULSE, SnomedConstants.Terms.PULSE
-        ));
+        sb.append("[\n");
 
-        for (TargetField tf : parsed) {
-            String fieldId = sanitizeFieldId(tf.term());
+        for (int i = 0; i < allFields.size(); i++) {
+            FieldInfo f = allFields.get(i);
+            String conceptIdStr = f.conceptId != null ? "\"" + f.conceptId + "\"" : "null";
+            String termStr = f.term != null ? "\"" + f.term + "\"" : "null";
             sb.append(String.format(
-                ",{\"id\": \"%s\", \"label\": \"%s\", \"type\": \"snomed-text\", \"value\": null, \"conceptId\": \"%s\", \"term\": \"%s\", \"snomedVerified\": false}",
-                fieldId, tf.term(), tf.conceptId(), tf.term()
+                "  {\"id\": \"%s\", \"label\": \"%s\", \"type\": \"%s\", \"value\": null, \"conceptId\": %s, \"term\": %s, \"snomedVerified\": false, \"terminology\": \"%s\"}",
+                f.id, f.label, f.type, conceptIdStr, termStr, f.terminology
             ));
+            if (i < allFields.size() - 1) {
+                sb.append(",\n");
+            } else {
+                sb.append("\n");
+            }
         }
 
-        sb.append("\n]");
+        sb.append("]");
         return sb.toString();
     }
 
-    private String buildFallbackResponse() {
-        return buildFallbackResponse(null);
-    }
 }

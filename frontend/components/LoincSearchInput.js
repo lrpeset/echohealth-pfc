@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../config";
 
-export default function SnomedSearchInput({
+export default function LoincSearchInput({
   label,
   value,
   conceptId,
@@ -82,7 +82,7 @@ export default function SnomedSearchInput({
     try {
       const token = await AsyncStorage.getItem("userToken");
       const response = await fetch(
-        `${API_URL}/api/terminology/search?q=${encodeURIComponent(searchTerm)}&system=SNOMED`,
+        `${API_URL}/api/terminology/search?q=${encodeURIComponent(searchTerm)}&system=LOINC`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -98,7 +98,7 @@ export default function SnomedSearchInput({
         setResults([]);
       }
     } catch (error) {
-      console.error("SNOMED search error:", error);
+      console.error("LOINC search error:", error);
       setResults([]);
     } finally {
       setLoading(false);
@@ -106,11 +106,7 @@ export default function SnomedSearchInput({
   };
 
   const handleSelect = (item) => {
-    console.log("Payload SNOMED:", item);
-    if (!item.conceptId) {
-      console.error("Error: El concepto SNOMED no tiene ID", item);
-      return;
-    }
+    console.log("Payload LOINC:", item);
     inputRef.current?.blur();
     onSelect({
       value: item.term,
@@ -118,7 +114,7 @@ export default function SnomedSearchInput({
       term: item.term,
       active: item.active,
       semanticTag: item.semanticTag || null,
-      system: "SNOMED",
+      system: "LOINC",
     });
     setQuery("");
     setResults([]);
@@ -135,7 +131,7 @@ export default function SnomedSearchInput({
       conceptId: null,
       term: null,
       semanticTag: null,
-      system: "SNOMED",
+      system: "LOINC",
     });
   };
 
@@ -153,8 +149,8 @@ export default function SnomedSearchInput({
         <Text style={styles.resultTerm} numberOfLines={2}>
           {item.term}
         </Text>
-        <View style={styles.systemBadgeSnomed}>
-          <Text style={styles.systemBadgeText}>{item.system || "SNOMED"}</Text>
+        <View style={styles.systemBadgeLoinc}>
+          <Text style={styles.systemBadgeText}>{item.system || "LOINC"}</Text>
         </View>
         {item.active && (
           <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 6 }} />
@@ -171,7 +167,7 @@ export default function SnomedSearchInput({
           {required && <Text style={styles.required}>*</Text>}
           {hasConcept && (
             <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={12} color="#1565C0" />
               <Text style={styles.verifiedText}>Verified</Text>
             </View>
           )}
@@ -184,7 +180,7 @@ export default function SnomedSearchInput({
             value={query}
             onChangeText={handleTextChange}
             editable={editable}
-            placeholder={placeholder || "Busca síntomas o diagnósticos..."}
+            placeholder={placeholder || "Busca tests, escalas o medidas..."}
             placeholderTextColor="#9CA3AF"
             keyboardType={keyboardType}
             onFocus={() => {
@@ -194,7 +190,7 @@ export default function SnomedSearchInput({
 
           <View style={styles.inputIcons}>
             {loading && (
-              <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+              <ActivityIndicator size="small" color="#1565C0" style={styles.loader} />
             )}
             {!loading && editable && query.length > 0 && (
               <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
@@ -202,14 +198,14 @@ export default function SnomedSearchInput({
               </TouchableOpacity>
             )}
             {!loading && !editable && hasConcept && (
-              <Ionicons name="medical" size={18} color="#4CAF50" style={styles.medicalIcon} />
+              <Ionicons name="medical" size={18} color="#1565C0" style={styles.medicalIcon} />
             )}
           </View>
         </View>
 
         {hasConcept && (
           <View style={styles.conceptInfo}>
-            <Text style={styles.conceptInfoLabel}>SNOMED CT:</Text>
+            <Text style={styles.conceptInfoLabel}>LOINC:</Text>
             <Text style={styles.conceptInfoValue}>{conceptId}</Text>
           </View>
         )}
@@ -261,7 +257,7 @@ const styles = StyleSheet.create({
   verifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "#E3F2FD",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -269,7 +265,7 @@ const styles = StyleSheet.create({
   },
   verifiedText: {
     fontSize: 10,
-    color: "#4CAF50",
+    color: "#1565C0",
     fontWeight: "600",
     marginLeft: 4,
   },
@@ -283,7 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   inputVerified: {
-    borderColor: "#4CAF50",
+    borderColor: "#1565C0",
     borderWidth: 2,
   },
   input: {
@@ -319,7 +315,7 @@ const styles = StyleSheet.create({
   },
   conceptInfoValue: {
     fontSize: 11,
-    color: "#4CAF50",
+    color: "#1565C0",
     fontWeight: "600",
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
@@ -372,8 +368,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#2C3E50",
   },
-  systemBadgeSnomed: {
-    backgroundColor: "#E8F5E9",
+  systemBadgeLoinc: {
+    backgroundColor: "#E3F2FD",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,

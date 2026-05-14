@@ -85,11 +85,7 @@ export default function HomeScreen({ navigation }) {
       <TouchableOpacity
         style={styles.card}
         onPress={() =>
-          navigation.navigate("Form", {
-            data: content,
-            isReadOnly: true,
-            consultationId: item.id,
-          })
+          navigation.navigate("ConsultationDetail", { consultationId: item.id })
         }
       >
         <View style={styles.iconContainer}>

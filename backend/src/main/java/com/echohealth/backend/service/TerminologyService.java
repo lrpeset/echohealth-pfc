@@ -1,10 +1,10 @@
 package com.echohealth.backend.service;
 
-import com.echohealth.backend.dto.SnomedConceptResponse;
+import com.echohealth.backend.dto.ConceptResponse;
 import java.util.List;
 
 public interface TerminologyService {
 
-    List<SnomedConceptResponse> searchConcepts(String query);
+    List<ConceptResponse> searchConcepts(String query);
 
 }
