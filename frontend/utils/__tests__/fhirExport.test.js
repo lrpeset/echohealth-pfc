@@ -1,128 +1,412 @@
-import { buildFhirJson, buildFhirCsv } from "../fhirExport";
+import {
+  buildFhirR5Bundle,
+  buildLongFormatCsv,
+} from "../fhirExport";
 
 // =============================================================================
-// TEST SUITE: Exportación FHIR
+// DATA MOCK — Consulta clínica dinámica con 5 campos de prueba extremos
 // =============================================================================
-// CRÍTICO PARA INTEROPERABILIDAD:
-//   Si la exportación no incluye system/code/display, el JSON no será
-//   utilizable por sistemas hospitalarios reales (Epic, Cerner, etc.).
-//   Estos tests verifican el contrato FHIR-R4.
+// Casos cubiertos:
+//   1. reasonForVisit — texto libre sin códigos (comprueba comas escapadas)
+//   2. LOINC numérico — altura 8302-2, valueQuantity con UCUM
+//   3. Panel compuesto — PA 85354-9 "120/80" → component systolic/diastolic
+//   4. Hallazgo SNOMED — 21522001 semanticTag="finding" → Condition
+//   5. Valor null — peso 29463-7 value=null → debe excluirse
 
-const sampleFields = [
-  {
-    id: "reasonForVisit",
-    label: "Motivo de la visita",
-    type: "snomed-text",
-    value: "Paciente con dolor lumbar",
-    conceptId: null,
-    term: null,
-    terminology: "SNOMED",
-    semanticTag: null,
-  },
-  {
-    id: "height",
-    label: "Altura (cm)",
-    type: "loinc-number",
-    value: 175,
-    conceptId: "8302-2",
-    term: "Body height",
-    terminology: "LOINC",
-    semanticTag: "clinical",
-  },
-  {
-    id: "custom_21522001",
-    label: "Dolor abdominal",
-    type: "snomed-text",
-    value: "Leve, tipo cólico",
-    conceptId: "21522001",
-    term: "Dolor abdominal",
-    terminology: "SNOMED",
-    semanticTag: "finding",
-  },
-];
+const mockConsultation = {
+  id: "test-cons-123",
+  userId: "dr_test_01",
+  createdAt: "2026-05-16T10:00:00Z",
+  fields: [
+    {
+      id: "reasonForVisit",
+      label: "Motivo de la visita",
+      type: "snomed-text",
+      value: "Paciente con dolor lumbar, irradiado a pierna derecha",
+      conceptId: null,
+      term: null,
+      terminology: "SNOMED",
+      semanticTag: null,
+    },
+    {
+      id: "height",
+      label: "Altura (cm)",
+      type: "loinc-number",
+      value: 175,
+      conceptId: "8302-2",
+      term: "Body height",
+      terminology: "LOINC",
+      semanticTag: "clinical",
+    },
+    {
+      id: "custom_85354_9",
+      label: "Presión arterial",
+      type: "loinc-text",
+      value: "120/80",
+      conceptId: "85354-9",
+      term: "Blood pressure panel",
+      terminology: "LOINC",
+      semanticTag: "clinical",
+    },
+    {
+      id: "custom_21522001",
+      label: "Dolor abdominal",
+      type: "snomed-text",
+      value: "Leve",
+      conceptId: "21522001",
+      term: "Dolor abdominal",
+      terminology: "SNOMED",
+      semanticTag: "finding",
+    },
+    {
+      id: "weight",
+      label: "Peso (kg)",
+      type: "loinc-number",
+      value: null,
+      conceptId: "29463-7",
+      term: "Body weight",
+      terminology: "LOINC",
+      semanticTag: "clinical",
+    },
+  ],
+};
 
-describe("buildFhirJson — Test de Contrato FHIR", () => {
+// =============================================================================
+// buildFhirR5Bundle (Bundle FHIR R5 tipo document)
+// =============================================================================
 
-  test("should_include_system_code_and_display_for_every_field_with_value", () => {
-    const jsonStr = buildFhirJson(sampleFields);
-    const parsed = JSON.parse(jsonStr);
+describe("buildFhirR5Bundle — Test de Interoperabilidad FHIR R5", () => {
+  const parsed = JSON.parse(buildFhirR5Bundle(mockConsultation));
+  const composition = parsed.entry[0].resource;
+  const patientEntry = parsed.entry.find(
+    (e) => e.resource.resourceType === "Patient"
+  );
+  const patientUuid = composition.subject[0].reference;
+  const allResources = parsed.entry.slice(1).map((e) => e.resource);
+  const resources = allResources.filter((r) => r.resourceType !== "Patient");
 
-    expect(parsed.exportVersion).toBe("FHIR-R4-1.0");
-    expect(parsed.fieldCount).toBe(3);
-
-    const loincField = parsed.fields.find((f) => f.id === "height");
-    expect(loincField.code).toBe("8302-2");
-    expect(loincField.system).toBe("LOINC");
-    expect(loincField.display).toBe("Body height");
-
-    const snomedField = parsed.fields.find((f) => f.id === "custom_21522001");
-    expect(snomedField.code).toBe("21522001");
-    expect(snomedField.system).toBe("SNOMED");
-    expect(snomedField.display).toBe("Dolor abdominal");
-
-    const reasonField = parsed.fields.find((f) => f.id === "reasonForVisit");
-    expect(reasonField.code).toBeNull();
-    expect(reasonField.system).toBe("SNOMED");
+  test("T1 — Estructura de Contenedor: Bundle type=document con identifier", () => {
+    expect(parsed.resourceType).toBe("Bundle");
+    expect(parsed.type).toBe("document");
+    expect(parsed.identifier.value).toBe("test-cons-123");
+    expect(parsed.identifier.system).toBe(
+      "https://echohealth.app/consultations"
+    );
   });
 
-  test("should_exclude_fields_with_null_value_from_export", () => {
-    const fieldsWithNull = [
-      ...sampleFields,
-      { id: "weight", label: "Peso", value: null, conceptId: "29463-7", terminology: "LOINC" },
-    ];
-
-    const jsonStr = buildFhirJson(fieldsWithNull);
-    const parsed = JSON.parse(jsonStr);
-
-    expect(parsed.fieldCount).toBe(3);
-    expect(parsed.fields.find((f) => f.id === "weight")).toBeUndefined();
+  test("T2 — Composición Principal: Composition final con LOINC 34108-1", () => {
+    expect(composition.resourceType).toBe("Composition");
+    expect(composition.id).toBe("composition-1");
+    expect(composition.status).toBe("final");
+    expect(composition.type.coding[0].code).toBe("34108-1");
+    expect(composition.type.coding[0].system).toBe("http://loinc.org");
+    expect(composition.type.coding[0].display).toBe("Outpatient Note");
+    expect(composition.title).toBe("EchoHealth - Resumen Clínico");
+    expect(composition.text).toBeDefined();
+    expect(composition.text.status).toBe("generated");
+    expect(composition.text.div).toContain(
+      "EchoHealth Clinical Summary Composition"
+    );
+    expect(Array.isArray(composition.subject)).toBe(true);
+    expect(composition.subject[0].reference).toMatch(/^urn:uuid:/);
+    expect(composition.subject[0].reference).toBe(patientUuid);
+    expect(patientEntry.fullUrl).toBe(patientUuid);
+    expect(patientEntry.resource.text).toBeDefined();
+    expect(patientEntry.resource.text.status).toBe("generated");
+    expect(patientEntry.resource.text.div).toContain(
+      "Anonymized Patient Resource"
+    );
+    expect(patientEntry.resource.identifier[0].value).toBe(
+      "dr_test_01"
+    );
+    expect(composition.subject[0].display).toBe(
+      "Patient-ID: dr_test_01"
+    );
+    expect(composition.confidentiality).toBeUndefined();
   });
 
-  test("should_generate_valid_json", () => {
-    const jsonStr = buildFhirJson(sampleFields);
-    expect(() => JSON.parse(jsonStr)).not.toThrow();
+  test("T3 — Secciones e Indexación: 3 secciones con referencias urn:uuid:", () => {
+    const sectionTitles = composition.section.map((s) => s.title);
+    expect(sectionTitles).toContain("Motivo de la consulta");
+    expect(sectionTitles).toContain("Mediciones y Tests");
+    expect(sectionTitles).toContain("Hallazgos Clínicos");
+    expect(composition.section.length).toBe(3);
+
+    const motivoSection = composition.section.find(
+      (s) => s.title === "Motivo de la consulta"
+    );
+    expect(motivoSection.entry.length).toBe(1);
+    expect(motivoSection.entry[0].reference).toMatch(/^urn:uuid:/);
+
+    const medicionesSection = composition.section.find(
+      (s) => s.title === "Mediciones y Tests"
+    );
+    expect(medicionesSection.entry.length).toBe(2);
+    medicionesSection.entry.forEach((e) =>
+      expect(e.reference).toMatch(/^urn:uuid:/)
+    );
+
+    const hallazgosSection = composition.section.find(
+      (s) => s.title === "Hallazgos Clínicos"
+    );
+    expect(hallazgosSection.entry.length).toBe(1);
+    expect(hallazgosSection.entry[0].reference).toMatch(/^urn:uuid:/);
+
+    const allFullUrls = parsed.entry.map((e) => e.fullUrl);
+    const referencedIds = composition.section.flatMap((s) =>
+      s.entry.map((e) => e.reference)
+    );
+    for (const ref of referencedIds) {
+      expect(allFullUrls).toContain(ref);
+    }
   });
 
-  test("should_return_valid_json_for_empty_or_null_fields", () => {
-    const jsonStr = buildFhirJson(null);
-    const parsed = JSON.parse(jsonStr);
+  test("T3b — Motivo de Consulta: obs-0 como LOINC 10154-3 con valueString plano", () => {
+    const reasonObs = resources.find((r) => r.id === "obs-0");
+    expect(reasonObs).toBeDefined();
+    expect(reasonObs.resourceType).toBe("Observation");
+    expect(reasonObs.text).toBeDefined();
+    expect(reasonObs.text.status).toBe("generated");
+    expect(reasonObs.text.div).toContain(
+      "Chief complaint Narrative - Reported"
+    );
+    expect(reasonObs.text.div).toContain(
+      "Paciente con dolor lumbar, irradiado a pierna derecha"
+    );
+    expect(reasonObs.code.coding[0].system).toBe("http://loinc.org");
+    expect(reasonObs.code.coding[0].code).toBe("10154-3");
+    expect(reasonObs.code.coding[0].display).toBe(
+      "Chief complaint Narrative - Reported"
+    );
+    expect(reasonObs.subject.reference).toBe(patientUuid);
+    expect(reasonObs.subject.display).toBe("Anonymous Patient");
+    expect(reasonObs.performer).toBeDefined();
+    expect(reasonObs.performer[0].display).toBe(
+      "EchoHealth AI Clinical Assistant"
+    );
+    expect(reasonObs.category).toBeUndefined();
+    expect(reasonObs.valueString).toBe(
+      "Paciente con dolor lumbar, irradiado a pierna derecha"
+    );
+    expect(reasonObs.valueCodeableConcept).toBeUndefined();
+  });
 
-    expect(parsed.fieldCount).toBe(0);
-    expect(parsed.fields).toEqual([]);
+  test("T4 — Mapeo de Cantidades UCUM: height valueQuantity con cm", () => {
+    const heightObs = resources.find(
+      (r) => r.id === "obs-1" && r.resourceType === "Observation"
+    );
+    expect(heightObs).toBeDefined();
+    expect(heightObs.text).toBeDefined();
+    expect(heightObs.text.status).toBe("generated");
+    expect(heightObs.text.div).toContain("Altura (cm)");
+    expect(heightObs.code.coding[0].code).toBe("8302-2");
+    expect(heightObs.code.coding[0].system).toBe("http://loinc.org");
+    expect(heightObs.subject.reference).toBe(patientUuid);
+    expect(heightObs.performer).toBeDefined();
+    expect(heightObs.performer[0].display).toBe(
+      "EchoHealth AI Clinical Assistant"
+    );
+    expect(heightObs.category).toBeDefined();
+    expect(heightObs.category[0].coding[0].code).toBe("vital-signs");
+    expect(heightObs.valueQuantity).toBeDefined();
+    expect(heightObs.valueQuantity.value).toBe(175);
+    expect(heightObs.valueQuantity.unit).toBe("cm");
+    expect(heightObs.valueQuantity.system).toBe(
+      "http://unitsofmeasure.org"
+    );
+    expect(heightObs.valueQuantity.code).toBe("cm");
+  });
+
+  test("T5 — Tratamiento de Panel Compuesto: PA 85354-9 con 2 componentes", () => {
+    const bpObs = resources.find(
+      (r) =>
+        r.id === "obs-2" &&
+        r.code.coding[0].code === "85354-9"
+    );
+    expect(bpObs).toBeDefined();
+    expect(bpObs.resourceType).toBe("Observation");
+    expect(bpObs.text).toBeDefined();
+    expect(bpObs.text.status).toBe("generated");
+    expect(bpObs.text.div).toContain("Presión arterial");
+    expect(bpObs.subject.reference).toBe(patientUuid);
+    expect(bpObs.performer).toBeDefined();
+    expect(bpObs.performer[0].display).toBe(
+      "EchoHealth AI Clinical Assistant"
+    );
+    expect(bpObs.category).toBeDefined();
+    expect(bpObs.category[0].coding[0].code).toBe("vital-signs");
+    expect(bpObs.component).toBeDefined();
+    expect(bpObs.component.length).toBe(2);
+
+    const systolic = bpObs.component[0];
+    expect(systolic.code.coding[0].code).toBe("8480-6");
+    expect(systolic.code.coding[0].system).toBe("http://loinc.org");
+    expect(systolic.code.coding[0].display).toBe(
+      "Systolic blood pressure"
+    );
+    expect(systolic.valueQuantity.value).toBe(120);
+    expect(systolic.valueQuantity.unit).toBe("mmHg");
+    expect(systolic.valueQuantity.system).toBe(
+      "http://unitsofmeasure.org"
+    );
+    expect(systolic.valueQuantity.code).toBe("mm[Hg]");
+
+    const diastolic = bpObs.component[1];
+    expect(diastolic.code.coding[0].code).toBe("8462-4");
+    expect(diastolic.code.coding[0].display).toBe(
+      "Diastolic blood pressure"
+    );
+    expect(diastolic.valueQuantity.value).toBe(80);
+  });
+
+  test("T6 — Tratamiento de Hallazgos SNOMED: finding → Condition", () => {
+    const condition = resources.find(
+      (r) => r.resourceType === "Condition"
+    );
+    expect(condition).toBeDefined();
+    expect(condition.id).toBe("condition-3");
+    expect(condition.subject.reference).toBe(patientUuid);
+    expect(condition.code.coding[0].code).toBe("21522001");
+    expect(condition.code.coding[0].system).toBe(
+      "http://snomed.info/sct"
+    );
+    expect(condition.code.coding[0].display).toBe("Dolor abdominal");
+    expect(condition.clinicalStatus.coding[0].code).toBe("active");
+    expect(condition.clinicalStatus.coding[0].system).toBe(
+      "http://terminology.hl7.org/CodeSystem/condition-clinical"
+    );
+    expect(condition.verificationStatus.coding[0].code).toBe(
+      "confirmed"
+    );
+    expect(condition.verificationStatus.coding[0].system).toBe(
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+    );
+    expect(condition.note).toBeDefined();
+    expect(condition.note[0].text).toBe("Leve");
+  });
+
+  test("T7 — Control de Tolerancia a Nulos: 0 recursos para campos null", () => {
+    expect(parsed.entry.length).toBe(6);
+    expect(composition.resourceType).toBe("Composition");
+    expect(resources.length).toBe(4);
+
+    const conceptIds = resources.map(
+      (r) => r.code?.coding?.[0]?.code || r.id
+    );
+    expect(conceptIds).not.toContain("29463-7");
+
+    const weightResource = resources.find(
+      (r) =>
+        r.code?.coding?.[0]?.code === "29463-7" ||
+        r.id === "condition-4"
+    );
+    expect(weightResource).toBeUndefined();
   });
 });
 
-describe("buildFhirCsv — Test de Formato CSV", () => {
+// =============================================================================
+// NUEVO — buildLongFormatCsv (CSV transaccional formato largo)
+// =============================================================================
 
-  test("should_generate_csv_with_header_and_correct_columns", () => {
-    const csv = buildFhirCsv(sampleFields);
-    const lines = csv.split("\n");
+function parseCsvRow(row) {
+  const fields = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (ch === '"' && !inQuotes) {
+      inQuotes = true;
+    } else if (ch === '"' && inQuotes) {
+      if (i + 1 < row.length && row[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = false;
+      }
+    } else if (ch === "," && !inQuotes) {
+      fields.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
 
-    expect(lines[0]).toBe("id,label,value,code,system,display,semanticTag");
+describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () => {
+  const csv = buildLongFormatCsv(mockConsultation);
+  const lines = csv.split("\n");
+  const dataRows = lines.slice(1).map(parseCsvRow);
 
-    const heightRow = lines.find((l) => l.startsWith("height"));
-    expect(heightRow).toContain("8302-2");
-    expect(heightRow).toContain("LOINC");
-    expect(heightRow).toContain("Body height");
+  test("T1 — Integridad de la Cabecera: columnas estándar", () => {
+    expect(lines[0]).toBe(
+      "fecha,consulta_id,medico_id,campo_id,terminologia,codigo_concepto,termino_concepto,valor_extraido,unidad,tipo_semantico"
+    );
   });
 
-  test("should_escape_commas_in_values", () => {
-    const csv = buildFhirCsv(sampleFields);
-    const painRow = csv.split("\n").find((l) => l.includes("21522001"));
-
-    expect(painRow).toMatch(/"Leve, tipo cólico"/);
+  test("T2 — Mapeo de Filas Transaccionales: 1 fila por campo activo (4 datos)", () => {
+    expect(lines.length).toBe(5);
+    expect(dataRows.length).toBe(4);
+    for (const row of dataRows) {
+      expect(row.length).toBe(10);
+    }
   });
 
-  test("should_return_header_only_when_all_fields_have_null_value", () => {
-    const nullFields = [
-      { id: "height", value: null },
-      { id: "weight", value: null },
-    ];
+  test("T3 — Inyección de Unidades: LOINC cm, SNOMED vacío", () => {
+    const loincRows = dataRows.filter(
+      (r) => r[4] === "LOINC" && r[5] === "8302-2"
+    );
+    expect(loincRows.length).toBe(1);
+    expect(loincRows[0][8]).toBe("cm");
 
-    const csv = buildFhirCsv(nullFields);
-    const lines = csv.split("\n");
+    const snomedRows = dataRows.filter((r) => r[4] === "SNOMED");
+    for (const row of snomedRows) {
+      expect(row[8]).toBe("");
+    }
+  });
 
-    expect(lines.length).toBe(1);
-    expect(lines[0]).toBe("id,label,value,code,system,display,semanticTag");
+  test("T4 — Escapado de Caracteres: comas internas entre comillas dobles", () => {
+    const reasonRow = dataRows.find(
+      (r) => r[3] === "reasonForVisit"
+    );
+    expect(reasonRow).toBeDefined();
+
+    const rawReasonLine = lines.find((l) =>
+      l.includes("reasonForVisit")
+    );
+    expect(rawReasonLine).toMatch(
+      /"Paciente con dolor lumbar, irradiado a pierna derecha"/
+    );
+
+    expect(reasonRow[7]).toBe(
+      "Paciente con dolor lumbar, irradiado a pierna derecha"
+    );
+  });
+
+  test("T5 — fecha column viaja con el ISO de la consulta (no vacía)", () => {
+    const csv = buildLongFormatCsv(mockConsultation);
+    const rows = csv.split("\n").slice(1).map(parseCsvRow);
+    for (const row of rows) {
+      expect(row[0]).toBe("2026-05-16T10:00:00.000Z");
+    }
+  });
+
+  test("T6 — tolera entradas null en fields[] sin colapsar", () => {
+    const corrupted = {
+      ...mockConsultation,
+      fields: [null, ...mockConsultation.fields, null],
+    };
+
+    const bundleStr = buildFhirR5Bundle(corrupted);
+    const bundle = JSON.parse(bundleStr);
+    const resources = bundle.entry.slice(1)
+      .filter((e) => e.resource.resourceType !== "Patient")
+      .map((e) => e.resource);
+    expect(resources.length).toBe(4);
+
+    const csv = buildLongFormatCsv(corrupted);
+    const rows = csv.split("\n").slice(1);
+    expect(rows.length).toBe(4);
   });
 });
