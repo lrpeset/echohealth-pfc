@@ -12,7 +12,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.echohealth.app",
+      "infoPlist": {
+        "NSCachesDirectoryDescription": "Acceso a caché para exportar archivos clínicos"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,10 +24,14 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.echohealth.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-file-system"
+    ]
   }
 }

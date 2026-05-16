@@ -11,8 +11,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { API_URL } from "../config";
-import { buildFhirJson, buildFhirCsv } from "../utils/fhirExport";
+import {
+  buildFhirR5Bundle,
+  buildLongFormatCsv,
+} from "../utils/fhirExport";
 
 export default function ConsultationDetailScreen({ route, navigation }) {
   const { consultationId } = route.params;
@@ -59,9 +64,23 @@ export default function ConsultationDetailScreen({ route, navigation }) {
   };
 
   const isRedFlag = (field) => {
-    if (!field || !field.term) return false;
-    const t = field.term.toLowerCase();
-    return t.includes("red flag") || t.includes("alerta");
+    if (!field) return false;
+    const t = (field.term || '').toLowerCase();
+    const l = (field.label || '').toLowerCase();
+    return t.includes("red flag") || t.includes("alerta") ||
+           l.includes("red flag") || l.includes("alerta");
+  };
+
+  const buildExportMetadata = (consultation) => {
+    const fields = consultation?.fields || [];
+    const hasRedFlags = fields.some(isRedFlag);
+    const fechaLimpia = consultation?.createdAt
+      ? consultation.createdAt.split('T')[0]
+      : 'export';
+    const refConsulta = consultation?.id
+      ? consultation.id.substring(0, 6)
+      : 'unknown';
+    return { hasRedFlags, fechaLimpia, refConsulta };
   };
 
   if (loading) {
@@ -143,27 +162,74 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       await Clipboard.setStringAsync(text);
       alert("Informe copiado al portapapeles");
     } catch (e) {
+      console.error("Error copying report to clipboard:", e.message, e.stack);
       alert("No se pudo copiar el texto");
     }
   };
 
-  const handleExportJson = async () => {
+  const exportFile = async (content, filename, mimeType, dialogTitle, uti) => {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      console.warn("⚠️ FileSystem.cacheDirectory is null — fallback to clipboard only");
+      return;
+    }
+
+    const fileUri = cacheDir + filename;
+
+    await FileSystem.writeAsStringAsync(fileUri, content, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    const sharingAvailable = await Sharing.isAvailableAsync();
+    if (!sharingAvailable) {
+      console.warn("⚠️ Sharing.isAvailableAsync() = false — fallback to clipboard only");
+      return;
+    }
+
+    await Sharing.shareAsync(fileUri, { mimeType, dialogTitle, UTI: uti });
+  };
+
+  const handleExportFhirR5 = async () => {
     try {
-      const fields = consultation?.fields || [];
-      await Clipboard.setStringAsync(buildFhirJson(fields));
-      alert("JSON clínico copiado al portapapeles");
+      const fhirBundle = buildFhirR5Bundle(consultation);
+      await Clipboard.setStringAsync(fhirBundle);
+
+      const { hasRedFlags, fechaLimpia, refConsulta } = buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? 'ALERT_' : '';
+      const filename = `${prefix}FHIR_Doc_Ref_${refConsulta}_${fechaLimpia}.json`;
+
+      await exportFile(
+        fhirBundle,
+        filename,
+        'application/json',
+        'Exportar FHIR R5 Bundle',
+        'public.json'
+      );
     } catch (e) {
-      alert("No se pudo copiar el JSON");
+      console.error("💥 ERROR CRÍTICO DE EXPORTACIÓN [FHIR]:", e.message, e.stack);
+      alert("Error al exportar el archivo FHIR .json. Los datos están en el portapapeles.");
     }
   };
 
-  const handleExportCsv = async () => {
+  const handleExportLongCsv = async () => {
     try {
-      const fields = consultation?.fields || [];
-      await Clipboard.setStringAsync(buildFhirCsv(fields));
-      alert("CSV clínico copiado al portapapeles");
+      const longCsv = buildLongFormatCsv(consultation);
+      await Clipboard.setStringAsync(longCsv);
+
+      const { hasRedFlags, fechaLimpia, refConsulta } = buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? 'ALERT_' : '';
+      const filename = `${prefix}Analytics_Ref_${refConsulta}_${fechaLimpia}.csv`;
+
+      await exportFile(
+        longCsv,
+        filename,
+        'text/csv',
+        'Exportar Analytics CSV',
+        'public.comma-separated-values-text'
+      );
     } catch (e) {
-      alert("No se pudo copiar el CSV");
+      console.error("💥 ERROR CRÍTICO DE EXPORTACIÓN [CSV]:", e.message, e.stack);
+      alert("Error al exportar el archivo CSV .csv. Los datos están en el portapapeles.");
     }
   };
 
@@ -279,15 +345,16 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       </TouchableOpacity>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.exportButtonJson} onPress={handleExportJson}>
-          <Ionicons name="code-slash-outline" size={18} color="#FFF" />
-          <Text style={styles.exportButtonText}>Exportar JSON (FHIR)</Text>
+        <TouchableOpacity style={styles.exportButtonFhirR5} onPress={handleExportFhirR5}>
+          <Ionicons name="document-text-outline" size={18} color="#FFF" />
+          <Text style={styles.exportButtonText}>FHIR R5 Bundle</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButtonCsv} onPress={handleExportCsv}>
-          <Ionicons name="grid-outline" size={18} color="#FFF" />
-          <Text style={styles.exportButtonText}>Exportar CSV</Text>
+        <TouchableOpacity style={styles.exportButtonLongCsv} onPress={handleExportLongCsv}>
+          <Ionicons name="analytics-outline" size={18} color="#FFF" />
+          <Text style={styles.exportButtonText}>CSV Long-Format</Text>
         </TouchableOpacity>
       </View>
+
     </ScrollView>
   );
 }
@@ -548,9 +615,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 10,
   },
-  exportButtonJson: {
+  exportButtonFhirR5: {
     flex: 1,
-    backgroundColor: "#1565C0",
+    backgroundColor: "#6A1B9A",
     flexDirection: "row",
     paddingVertical: 14,
     borderRadius: 14,
@@ -558,9 +625,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  exportButtonCsv: {
+  exportButtonLongCsv: {
     flex: 1,
-    backgroundColor: "#2E7D32",
+    backgroundColor: "#00838F",
     flexDirection: "row",
     paddingVertical: 14,
     borderRadius: 14,
