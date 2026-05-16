@@ -377,12 +377,10 @@ function buildComposition(consultation, sectionEntries, patientUuid) {
       ],
       text: 'EchoHealth Clinical Summary',
     },
-    subject: [
-      {
-        reference: patientUuid,
-        display: `Patient-ID: ${consultation.userId || 'Unknown'}`,
-      },
-    ],
+    subject: {
+      reference: patientUuid,
+      display: 'Anonymous Patient Reference',
+    },
     date: formatFhirDate(consultation.createdAt || now),
     author: [
       {

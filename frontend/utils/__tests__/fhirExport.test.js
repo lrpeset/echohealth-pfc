@@ -81,7 +81,7 @@ describe("buildFhirR5Bundle — Test de Interoperabilidad FHIR R5", () => {
   const patientEntry = parsed.entry.find(
     (e) => e.resource.resourceType === "Patient"
   );
-  const patientUuid = composition.subject[0].reference;
+  const patientUuid = composition.subject.reference;
   const allResources = parsed.entry.slice(1).map((e) => e.resource);
   const resources = allResources.filter((r) => r.resourceType !== "Patient");
 
@@ -107,9 +107,9 @@ describe("buildFhirR5Bundle — Test de Interoperabilidad FHIR R5", () => {
     expect(composition.text.div).toContain(
       "EchoHealth Clinical Summary Composition"
     );
-    expect(Array.isArray(composition.subject)).toBe(true);
-    expect(composition.subject[0].reference).toMatch(/^urn:uuid:/);
-    expect(composition.subject[0].reference).toBe(patientUuid);
+    expect(typeof composition.subject).toBe('object');
+    expect(composition.subject.reference).toMatch(/^urn:uuid:/);
+    expect(composition.subject.reference).toBe(patientUuid);
     expect(patientEntry.fullUrl).toBe(patientUuid);
     expect(patientEntry.resource.text).toBeDefined();
     expect(patientEntry.resource.text.status).toBe("generated");
@@ -119,8 +119,8 @@ describe("buildFhirR5Bundle — Test de Interoperabilidad FHIR R5", () => {
     expect(patientEntry.resource.identifier[0].value).toBe(
       "dr_test_01"
     );
-    expect(composition.subject[0].display).toBe(
-      "Patient-ID: dr_test_01"
+    expect(composition.subject.display).toBe(
+      "Anonymous Patient Reference"
     );
     expect(composition.confidentiality).toBeUndefined();
   });
