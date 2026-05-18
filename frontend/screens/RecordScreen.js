@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,25 @@ export default function RecordScreen({ navigation }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(
+              "Módulo OCR Inteligente",
+              "Esta funcionalidad requiere conexión con el módulo externo EchoHealth Vision Cloud (API en desarrollo). Permite escanear informes manuscritos e integrarlos en la estructura actual del paciente.",
+              [{ text: "OK" }]
+            )
+          }
+          style={{ marginRight: 20 }}
+        >
+          <Ionicons name="scan-outline" size={26} color="#4CAF50" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   useEffect(() => {
     fetchTemplates();
