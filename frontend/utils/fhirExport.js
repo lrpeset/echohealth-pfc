@@ -1,8 +1,8 @@
 /**
- * EchoHealth — Módulo de Exportación FHIR R5 e Interoperabilidad
+ * EchoHealth — Módulo de Exportación FHIR R4 e Interoperabilidad
  *
  * Convierte el array fields[] de una consulta clínica dinámica en formatos
- * interoperables estándar: FHIR R5 Bundle (tipo document) y CSV transaccional
+ * interoperables estándar: FHIR R4 Bundle (tipo document) y CSV transaccional
  * en formato largo.
  *
  * ESTRATEGIA DE MAPEO (Blueprint Conceptual):
@@ -121,7 +121,7 @@ function formatFhirDate(dateStr) {
 }
 
 // =========================================================================
-// NÚCLEO: MAPEO DE CADA FIELD A RECURSO FHIR R5
+// NÚCLEO: MAPEO DE CADA FIELD A RECURSO FHIR R4
 // =========================================================================
 
 function parseBloodPressure(value) {
@@ -424,16 +424,16 @@ function buildComposition(consultation, sectionEntries, patientUuid) {
 }
 
 // =========================================================================
-// API PÚBLICA: buildFhirR5Bundle
+// API PÚBLICA: buildFhirR4Bundle
 // =========================================================================
 
 /**
- * Convierte una consulta completa en un Bundle FHIR R5 de tipo "document".
+ * Convierte una consulta completa en un Bundle FHIR R4 de tipo "document".
  *
  * @param {Object} consultation - Objeto consulta { id, userId, createdAt, fields: [...] }
- * @returns {string} JSON string del Bundle FHIR R5 formateado
+ * @returns {string} JSON string del Bundle FHIR R4 formateado
  */
-export function buildFhirR5Bundle(consultation) {
+export function buildFhirR4Bundle(consultation) {
   const fields = consultation?.fields || []
   const now = nowISO()
   const clinicalDate = consultation?.createdAt || now
