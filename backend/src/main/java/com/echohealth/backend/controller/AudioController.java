@@ -17,6 +17,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/audio")
+@CrossOrigin(origins = "*")
 public class AudioController {
 
     private static final Logger log = LoggerFactory.getLogger(AudioController.class);
@@ -30,14 +31,9 @@ public class AudioController {
     }
 
     /**
-     * Endpoint de subida de audio clínico.
-     * Recibe el archivo de audio y la lista de campos destino (targetFields),
-     * delega en GeminiService para la extracción por IA y devuelve una respuesta
-     * estructurada con los fields extraídos y metadatos de procesamiento.
-     *
-     * @param file         Archivo de audio (multipart)
-     * @param targetFields Lista de strings en formato id|label|conceptId|term|system|type
-     * @return AudioUploadResponse con fields[] + metadata
+     * Orquesta la subida del audio clínico transaccional y su parseo semántico.
+     * Delega el flujo binario en GeminiService utilizando el protocolo de inyección
+     * de plantillas.
      */
     @PostMapping("/upload")
     public ResponseEntity<?> uploadAudio(
@@ -56,12 +52,14 @@ public class AudioController {
 
         String rawJson = geminiService.analyzeAudio(file, targetFields);
 
-        // Detectar si la respuesta contiene un _error (fallo de API Gemini)
+        // Control defensivo: intercepta quiebres de cuota u obsolescencia de endpoints
+        // de la API externa
         if (rawJson != null && rawJson.contains("\"_error\"")) {
             log.error("La respuesta contiene _error - propagando al frontend");
             try {
                 List<Map<String, Object>> fields = objectMapper.readValue(
-                        rawJson, new TypeReference<List<Map<String, Object>>>() {});
+                        rawJson, new TypeReference<List<Map<String, Object>>>() {
+                        });
                 String errorMsg = fields.stream()
                         .filter(f -> f.containsKey("_error"))
                         .map(f -> (String) f.get("_error"))
@@ -88,17 +86,16 @@ public class AudioController {
     }
 
     /**
-     * Convierte el JSON array plano devuelto por Gemini en un AudioUploadResponse
-     * estructurado con fields y metadatos. Si el parseo falla, devuelve una
-     * respuesta vacía con metadatos de error.
+     * Reconstruye el JSON simétrico estructurado e inyecta la capa de telemetría
+     * médica.
      */
     private AudioUploadResponse wrapWithMetadata(String rawJson) {
         try {
             List<Map<String, Object>> fields = objectMapper.readValue(
-                    rawJson, new TypeReference<List<Map<String, Object>>>() {});
+                    rawJson, new TypeReference<List<Map<String, Object>>>() {
+                    });
 
-            AudioUploadResponse.ProcessingMetadata metadata =
-                    AudioUploadResponse.ProcessingMetadata.from(fields);
+            AudioUploadResponse.ProcessingMetadata metadata = AudioUploadResponse.ProcessingMetadata.from(fields);
 
             List<String> redFlags = AudioUploadResponse.detectRedFlags(fields);
             if (!redFlags.isEmpty()) {
