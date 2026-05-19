@@ -24,6 +24,19 @@ export default function ConsultationDetailScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     fetchConsultation();
+
+    navigation.setOptions({
+      headerStyle: {
+        backgroundColor: "#F5F7FA",
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 0,
+      },
+      headerTintColor: "#2C3E50",
+      headerTitleStyle: {
+        fontWeight: "700",
+      },
+    });
   }, [consultationId]);
 
   const fetchConsultation = async () => {
@@ -143,8 +156,8 @@ export default function ConsultationDetailScreen({ route, navigation }) {
   const hasRedFlag = [...loincFields, ...snomedFields].some(isRedFlag);
 
   const consultationIcon = getIconForConsultation(
-    reasonField?.value || "",
-    consultation.category || "",
+    reasonField?.value || consultation.content?.reasonForVisit || "",
+    consultation.content?.category || consultation.category || "",
   );
 
   const renderTerminologyBadge = (field) => {
@@ -448,9 +461,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     paddingVertical: 20,
     paddingHorizontal: 20,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    marginTop: 10,
+    marginHorizontal: 16,
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerIconRow: {
     flexDirection: "row",
@@ -500,12 +519,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 18,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },

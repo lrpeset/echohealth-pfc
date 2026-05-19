@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useLayoutEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, MOCK_MODE } from "../config";
 import { mockConsultations } from "../mocks/consultationsMock";
@@ -18,6 +18,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export default function HistoryScreen({ navigation }) {
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShadowVisible: false,
+      headerStyle: {
+        backgroundColor: "#F5F7FA",
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 0,
+      },
+    });
+  }, [navigation]);
 
   const fetchAllConsultations = async () => {
     setLoading(true);
@@ -118,8 +130,11 @@ export default function HistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  listPadding: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20 },
-
+  listPadding: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
   card: {
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
@@ -127,13 +142,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
-    elevation: 1,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    borderWidth: 1,
-    borderColor: "#E1E4E8",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
 
   iconContainer: {
