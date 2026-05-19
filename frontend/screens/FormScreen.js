@@ -20,7 +20,8 @@ function parseFieldRedFlags(redFlags) {
   if (!redFlags || !Array.isArray(redFlags)) return flags;
   redFlags.forEach((msg) => {
     if (msg.includes("Saturación")) flags.add("oxygenSaturation");
-    if (msg.includes("Taquicardia") || msg.includes("Bradicardia")) flags.add("pulse");
+    if (msg.includes("Taquicardia") || msg.includes("Bradicardia"))
+      flags.add("pulse");
     if (msg.includes("Presión arterial")) flags.add("bloodPressure");
   });
   return flags;
@@ -50,15 +51,26 @@ function resetFields(normalizedData) {
 }
 
 export default function FormScreen({ route, navigation }) {
-  const { data: rawData, isReadOnly = false, consultationId = null } = route.params;
+  const {
+    data: rawData,
+    isReadOnly = false,
+    consultationId = null,
+  } = route.params;
 
   const [isEditing, setIsEditing] = useState(!isReadOnly);
 
-  const normalizedData = React.useMemo(() => normalizeConsultation(rawData), [rawData]);
+  const normalizedData = React.useMemo(
+    () => normalizeConsultation(rawData),
+    [rawData],
+  );
 
-  const [fields, setFields] = useState(() => buildInitialFields(normalizedData));
+  const [fields, setFields] = useState(() =>
+    buildInitialFields(normalizedData),
+  );
 
-  const [fieldRedFlags] = useState(() => parseFieldRedFlags(normalizedData.redFlags));
+  const [fieldRedFlags] = useState(() =>
+    parseFieldRedFlags(normalizedData.redFlags),
+  );
 
   const allFieldIds = Object.keys(fields);
 
@@ -66,7 +78,10 @@ export default function FormScreen({ route, navigation }) {
     if (isReadOnly && !isEditing) {
       navigation.setOptions({
         headerRight: () => (
-          <TouchableOpacity onPress={() => setIsEditing(true)} style={{ marginRight: 20 }}>
+          <TouchableOpacity
+            onPress={() => setIsEditing(true)}
+            style={{ marginRight: 20 }}
+          >
             <Ionicons name="create-outline" size={26} color="#4CAF50" />
           </TouchableOpacity>
         ),
@@ -95,7 +110,8 @@ export default function FormScreen({ route, navigation }) {
     return allFieldIds.some((fieldId) => {
       const current = fields[fieldId];
       const originalField = original.find((f) => f.id === fieldId);
-      const originalValue = originalField?.value != null ? String(originalField.value) : "";
+      const originalValue =
+        originalField?.value != null ? String(originalField.value) : "";
       return String(current.value) !== originalValue;
     });
   };
@@ -113,26 +129,41 @@ export default function FormScreen({ route, navigation }) {
       if (type.endsWith("-number")) {
         const num = parseFloat(value);
         if (isNaN(num)) {
-          Alert.alert("Inválido", `El campo "${field.label || fieldId}" debe ser un número válido.`);
+          Alert.alert(
+            "Inválido",
+            `El campo "${field.label || fieldId}" debe ser un número válido.`,
+          );
           return false;
         }
         if (num < 0) {
-          Alert.alert("Inválido", `El campo "${field.label || fieldId}" no puede ser negativo.`);
+          Alert.alert(
+            "Inválido",
+            `El campo "${field.label || fieldId}" no puede ser negativo.`,
+          );
           return false;
         }
         if (fieldId === "oxygenSaturation" && num > 100) {
-          Alert.alert("Fuera de rango", "La saturación de oxígeno debe estar entre 0% y 100%.");
+          Alert.alert(
+            "Fuera de rango",
+            "La saturación de oxígeno debe estar entre 0% y 100%.",
+          );
           return false;
         }
         if (fieldId === "painIntensity" && num > 10) {
-          Alert.alert("Fuera de rango", "La intensidad del dolor debe estar entre 0 y 10.");
+          Alert.alert(
+            "Fuera de rango",
+            "La intensidad del dolor debe estar entre 0 y 10.",
+          );
           return false;
         }
       }
 
       if (fieldId === "bloodPressure" && value.length > 0) {
         if (!/^\d{2,3}\/\d{2,3}$/.test(value)) {
-          Alert.alert("Formato inválido", "La presión arterial debe tener el formato: 120/80");
+          Alert.alert(
+            "Formato inválido",
+            "La presión arterial debe tener el formato: 120/80",
+          );
           return false;
         }
       }
@@ -153,7 +184,7 @@ export default function FormScreen({ route, navigation }) {
         [
           { text: "Revisar", style: "cancel" },
           { text: "Correcto", onPress: () => finalize() },
-        ]
+        ],
       );
     } else {
       finalize();
@@ -208,9 +239,10 @@ export default function FormScreen({ route, navigation }) {
         consultationId
           ? "El historial ha sido actualizado."
           : "La nueva consulta ha sido creada.",
-        [{ text: "OK", onPress: () => navigation.popToTop() }]
+        [{ text: "OK", onPress: () => navigation.popToTop() }],
       );
     } catch (error) {
+      console.error("Error en el servidor o conexión:", error);
       Alert.alert("Error", "No se pudo conectar con el servidor.");
     }
   };
@@ -245,7 +277,7 @@ export default function FormScreen({ route, navigation }) {
   if (allFieldIds.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="document-text-outline" size={48} color="#CBD5E1" />
+        <Ionicons name="document-text-outline" size={48} color="#7F8C8D" />
         <Text style={styles.emptyTitle}>Sin campos</Text>
         <Text style={styles.emptySubtitle}>
           No se recibieron campos de la plantilla seleccionada.
@@ -266,14 +298,20 @@ export default function FormScreen({ route, navigation }) {
       >
         <View style={styles.paper}>
           {isReadOnly && (
-            <View style={[styles.badgeContainer, isEditing && styles.badgeEditing]}>
+            <View
+              style={[styles.badgeContainer, isEditing && styles.badgeEditing]}
+            >
               <Ionicons
                 name={isEditing ? "pencil" : "document-lock"}
                 size={16}
                 color={isEditing ? "#FF9800" : "#4CAF50"}
               />
-              <Text style={[styles.badgeText, isEditing && { color: "#FF9800" }]}>
-                {isEditing ? "MODO EDICIÓN ACTIVADO" : "DOCUMENTO CLÍNICO CERRADO"}
+              <Text
+                style={[styles.badgeText, isEditing && { color: "#FF9800" }]}
+              >
+                {isEditing
+                  ? "MODO EDICIÓN ACTIVADO"
+                  : "DOCUMENTO CLÍNICO CERRADO"}
               </Text>
             </View>
           )}
@@ -284,7 +322,10 @@ export default function FormScreen({ route, navigation }) {
         {isEditing && (
           <View style={styles.actionContainer}>
             {isReadOnly && (
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+              >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
             )}
@@ -310,6 +351,7 @@ export default function FormScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
   scrollContent: { padding: 20, paddingBottom: 50 },
+
   paper: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -321,6 +363,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 25,
   },
+
   badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -340,6 +383,7 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     marginLeft: 6,
   },
+
   actionContainer: { gap: 12 },
   saveButton: {
     backgroundColor: "#4CAF50",
@@ -350,7 +394,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -365,6 +409,7 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
   cancelButtonText: { color: "#7F8C8D", fontSize: 16, fontWeight: "bold" },
+
   emptyContainer: {
     flex: 1,
     justifyContent: "center",

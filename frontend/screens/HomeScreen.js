@@ -60,7 +60,7 @@ export default function HomeScreen({ navigation }) {
       const data = await response.json();
       setRecentConsultations(data.slice(0, 3));
     } catch (error) {
-      console.error("Error en conexión real:", error);
+      console.error("Error en conexión real:", error); // Deshabilitado para producción
     } finally {
       setLoading(false);
     }
@@ -74,8 +74,7 @@ export default function HomeScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const reason = extractReasonForVisit(item);
-    const category =
-      item.content?.category || item.category || null;
+    const category = item.content?.category || item.category || null;
 
     const date = new Date(item.createdAt).toLocaleDateString("es-ES");
     const iconData = getIconForConsultation(reason, category);
@@ -179,13 +178,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
     paddingBottom: 30,
     backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.02,
     shadowRadius: 10,
-    elevation: 3,
+    elevation: 1,
     zIndex: 10,
   },
   greeting: { fontSize: 28, fontWeight: "bold", color: "#2C3E50" },
@@ -199,11 +198,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 5,
   },
   mainButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+
   listContainer: { flex: 1, padding: 20 },
   sectionTitle: {
     fontSize: 18,
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconContainer: {
     width: 44,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   textContainer: { flex: 1 },
   cardDate: {
     fontSize: 12,
-    color: "#95A5A6",
+    color: "#7F8C8D",
     fontWeight: "600",
     marginBottom: 2,
   },
@@ -245,7 +245,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2C3E50",
   },
-  emptyText: { textAlign: "center", color: "#95A5A6", marginTop: 20 },
+  emptyText: { textAlign: "center", color: "#7F8C8D", marginTop: 20 },
+
   secondaryButton: {
     flexDirection: "row",
     marginTop: 10,
@@ -253,5 +254,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  secondaryButtonText: { color: "#0066cc", fontSize: 15, fontWeight: "600" },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 15,
+    fontWeight: "600",
+  },
 });

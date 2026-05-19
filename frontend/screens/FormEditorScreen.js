@@ -19,7 +19,13 @@ import { API_URL } from "../config";
 const TERMINOLOGY_OPTIONS = ["SNOMED", "LOINC"];
 
 const BUILT_IN_FIELDS = [
-  { id: "reasonForVisit", label: "Motivo de la visita", type: "snomed-text", required: true, removable: false },
+  {
+    id: "reasonForVisit",
+    label: "Motivo de la visita",
+    type: "snomed-text",
+    required: true,
+    removable: false,
+  },
 ];
 
 export default function FormEditorScreen({ route, navigation }) {
@@ -51,7 +57,9 @@ export default function FormEditorScreen({ route, navigation }) {
       if (response.ok) {
         const data = await response.json();
         setTemplateName(data.name || "");
-        const loaded = (data.fields || []).filter((f) => !BUILT_IN_FIELDS.find((b) => b.id === f.id));
+        const loaded = (data.fields || []).filter(
+          (f) => !BUILT_IN_FIELDS.find((b) => b.id === f.id),
+        );
         setCustomFields(loaded);
       }
     } catch (e) {
@@ -106,9 +114,13 @@ export default function FormEditorScreen({ route, navigation }) {
         id: "reasonForVisit",
         label: "Motivo de la visita",
         type: "snomed-text",
-        conceptId: null, term: null, semanticTag: null,
-        conceptVerified: false, terminology: "SNOMED",
-        required: true, removable: false,
+        conceptId: null,
+        term: null,
+        semanticTag: null,
+        conceptVerified: false,
+        terminology: "SNOMED",
+        required: true,
+        removable: false,
       },
       ...customFields.map((f) => ({
         id: f.id,
@@ -168,7 +180,11 @@ export default function FormEditorScreen({ route, navigation }) {
           <View style={styles.fieldInfo}>
             <Ionicons name="pulse-outline" size={18} color="#4CAF50" />
             <Text style={styles.fieldTerm}>{item.term || item.label}</Text>
-            <View style={isLoinc ? styles.systemBadgeLoinc : styles.systemBadgeSnomed}>
+            <View
+              style={
+                isLoinc ? styles.systemBadgeLoinc : styles.systemBadgeSnomed
+              }
+            >
               <Text style={styles.systemBadgeText}>{terminology}</Text>
             </View>
             {item.semanticTag && (
@@ -177,19 +193,28 @@ export default function FormEditorScreen({ route, navigation }) {
               </View>
             )}
           </View>
-          <TouchableOpacity onPress={() => removeField(index)} style={styles.removeBtn}>
+          <TouchableOpacity
+            onPress={() => removeField(index)}
+            style={styles.removeBtn}
+          >
             <Ionicons name="close-circle" size={22} color="#E74C3C" />
           </TouchableOpacity>
         </View>
         <View style={styles.fieldMeta}>
-          <Text style={styles.metaText}>{terminology}: {item.conceptId}</Text>
+          <Text style={styles.metaText}>
+            {terminology}: {item.conceptId}
+          </Text>
         </View>
       </View>
     );
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Nombre de la plantilla</Text>
         <TextInput
@@ -204,7 +229,8 @@ export default function FormEditorScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Campo obligatorio</Text>
         <Text style={styles.sectionDesc}>
-          Solo el motivo de la visita es obligatorio. Añade campos clínicos adicionales según necesites.
+          Solo el motivo de la visita es obligatorio. Añade campos clínicos
+          adicionales según necesites.
         </Text>
         <View style={styles.builtinRow}>
           <Ionicons name="lock-closed" size={16} color="#90A4AE" />
@@ -218,8 +244,15 @@ export default function FormEditorScreen({ route, navigation }) {
       <View style={styles.section}>
         <View style={styles.terminologyHeader}>
           <Text style={styles.sectionTitle}>Seleccionar terminología</Text>
-          <TouchableOpacity onPress={() => setShowInfoModal(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="information-circle-outline" size={22} color="#90A4AE" />
+          <TouchableOpacity
+            onPress={() => setShowInfoModal(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={22}
+              color="#90A4AE"
+            />
           </TouchableOpacity>
         </View>
         <Text style={styles.sectionDesc}>
@@ -229,11 +262,19 @@ export default function FormEditorScreen({ route, navigation }) {
           {TERMINOLOGY_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt}
-              style={[styles.segmentOption, activeSystem === opt && styles.segmentOptionActive]}
+              style={[
+                styles.segmentOption,
+                activeSystem === opt && styles.segmentOptionActive,
+              ]}
               onPress={() => setActiveSystem(opt)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.segmentText, activeSystem === opt && styles.segmentTextActive]}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  activeSystem === opt && styles.segmentTextActive,
+                ]}
+              >
                 {opt}
               </Text>
             </TouchableOpacity>
@@ -246,7 +287,8 @@ export default function FormEditorScreen({ route, navigation }) {
           Añadir concepto {activeSystem === "LOINC" ? "LOINC" : "SNOMED"}
         </Text>
         <Text style={styles.sectionDesc}>
-          Busca y selecciona conceptos clínicos adicionales que quieras que la IA extraiga automáticamente.
+          Busca y selecciona conceptos clínicos adicionales que quieras que la
+          IA extraiga automáticamente.
         </Text>
         {activeSystem === "LOINC" ? (
           <LoincSearchInput
@@ -277,12 +319,22 @@ export default function FormEditorScreen({ route, navigation }) {
             <Text style={styles.sectionTitle}>
               Campos personalizados ({customFields.length})
             </Text>
-            <TouchableOpacity onPress={() => {
-              Alert.alert("Restablecer", "¿Eliminar todos los campos personalizados?", [
-                { text: "Cancelar", style: "cancel" },
-                { text: "Restablecer", style: "destructive", onPress: () => setCustomFields([]) },
-              ]);
-            }}>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  "Restablecer",
+                  "¿Eliminar todos los campos personalizados?",
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    {
+                      text: "Restablecer",
+                      style: "destructive",
+                      onPress: () => setCustomFields([]),
+                    },
+                  ],
+                );
+              }}
+            >
               <Text style={styles.resetText}>Restablecer</Text>
             </TouchableOpacity>
           </View>
@@ -297,10 +349,11 @@ export default function FormEditorScreen({ route, navigation }) {
 
       {customFields.length === 0 && (
         <View style={styles.emptyState}>
-          <Ionicons name="flask-outline" size={48} color="#CFD8DC" />
+          <Ionicons name="flask-outline" size={48} color="#7F8C8D" />
           <Text style={styles.emptyTitle}>Sin campos personalizados</Text>
           <Text style={styles.emptyDesc}>
-            Usa el buscador de arriba para añadir conceptos clínicos (SNOMED o LOINC).
+            Usa el buscador de arriba para añadir conceptos clínicos (SNOMED o
+            LOINC).
           </Text>
         </View>
       )}
@@ -310,20 +363,41 @@ export default function FormEditorScreen({ route, navigation }) {
         onPress={handleSave}
         disabled={saving}
       >
-        <Ionicons name={saving ? "hourglass" : "checkmark-circle"} size={20} color="#FFF" />
-        <Text style={styles.saveButtonText}>{saving ? "Guardando..." : "Guardar plantilla"}</Text>
+        <Ionicons
+          name={saving ? "hourglass" : "checkmark-circle"}
+          size={20}
+          color="#FFF"
+        />
+        <Text style={styles.saveButtonText}>
+          {saving ? "Guardando..." : "Guardar plantilla"}
+        </Text>
       </TouchableOpacity>
 
-      <Modal visible={showInfoModal} transparent animationType="slide" onRequestClose={() => setShowInfoModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowInfoModal(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.modalContainer}>
+      <Modal
+        visible={showInfoModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowInfoModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.modalContainer}
+          >
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderIcon}>
                 <Ionicons name="information-circle" size={28} color="#4CAF50" />
               </View>
               <Text style={styles.modalTitle}>¿Qué terminología usar?</Text>
-              <Text style={styles.modalSubtitle}>Cada estándar cubre un tipo de información clínica distinta.</Text>
+              <Text style={styles.modalSubtitle}>
+                Cada estándar cubre un tipo de información clínica distinta.
+              </Text>
             </View>
             <View style={styles.modalDivider} />
             <View style={styles.modalBody}>
@@ -336,8 +410,13 @@ export default function FormEditorScreen({ route, navigation }) {
                   <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
                 </View>
                 <Text style={styles.infoCardTitle}>Hallazgos clínicos</Text>
-                <Text style={styles.infoCardDesc}>Úsalo para Diagnósticos y Síntomas</Text>
-                <Text style={styles.infoCardExample}>Dolor lumbar, Fractura de fémur, Contractura cervical, Tabaquismo</Text>
+                <Text style={styles.infoCardDesc}>
+                  Úsalo para Diagnósticos y Síntomas
+                </Text>
+                <Text style={styles.infoCardExample}>
+                  Dolor lumbar, Fractura de fémur, Contractura cervical,
+                  Tabaquismo
+                </Text>
               </View>
               <View style={styles.infoCard}>
                 <View style={styles.infoCardHeader}>
@@ -348,11 +427,19 @@ export default function FormEditorScreen({ route, navigation }) {
                   <Ionicons name="checkmark-circle" size={18} color="#1565C0" />
                 </View>
                 <Text style={styles.infoCardTitle}>Mediciones y tests</Text>
-                <Text style={styles.infoCardDesc}>Úsalo para Constantes Vitales y Tests</Text>
-                <Text style={styles.infoCardExample}>Tensión arterial, IMC, Escala de dolor, Test de 6 minutos marcha</Text>
+                <Text style={styles.infoCardDesc}>
+                  Úsalo para Constantes Vitales y Tests
+                </Text>
+                <Text style={styles.infoCardExample}>
+                  Tensión arterial, IMC, Escala de dolor, Test de 6 minutos
+                  marcha
+                </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.modalButton} onPress={() => setShowInfoModal(false)}>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowInfoModal(false)}
+            >
               <Text style={styles.modalButtonText}>Entendido</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -365,6 +452,7 @@ export default function FormEditorScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
   content: { padding: 20, paddingBottom: 50 },
+
   section: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -410,6 +498,7 @@ const styles = StyleSheet.create({
     color: "#2C3E50",
     marginTop: 4,
   },
+
   builtinRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -420,7 +509,7 @@ const styles = StyleSheet.create({
   builtinText: {
     flex: 1,
     fontSize: 14,
-    color: "#546E7A",
+    color: "#7F8C8D",
     marginLeft: 10,
   },
   builtinType: {
@@ -434,9 +523,10 @@ const styles = StyleSheet.create({
     color: "#78909C",
     fontWeight: "600",
   },
+
   fieldCard: {
     backgroundColor: "#F8FFFE",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
@@ -498,6 +588,7 @@ const styles = StyleSheet.create({
     color: "#2C3E50",
     fontWeight: "700",
   },
+
   segmentedControl: {
     flexDirection: "row",
     backgroundColor: "#F3F4F6",
@@ -514,7 +605,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
@@ -532,6 +623,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+
   saveButton: {
     backgroundColor: "#4CAF50",
     borderRadius: 16,
@@ -542,7 +634,7 @@ const styles = StyleSheet.create({
     gap: 8,
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -551,6 +643,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -565,7 +658,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.05,
     shadowRadius: 20,
     elevation: 15,
   },
@@ -599,7 +692,7 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
-    color: "#90A4AE",
+    color: "#7F8C8D",
     textAlign: "center",
     lineHeight: 20,
     marginTop: 4,
@@ -658,7 +751,7 @@ const styles = StyleSheet.create({
   },
   infoCardDesc: {
     fontSize: 13,
-    color: "#546E7A",
+    color: "#7F8C8D",
     marginBottom: 6,
     lineHeight: 18,
   },
@@ -686,12 +779,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#90A4AE",
+    color: "#7F8C8D",
     marginTop: 12,
   },
   emptyDesc: {
     fontSize: 13,
-    color: "#B0BEC5",
+    color: "#7F8C8D",
     textAlign: "center",
     marginTop: 6,
     lineHeight: 18,

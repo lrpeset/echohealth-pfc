@@ -9,15 +9,13 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { getIconForConsultation } from "../utils/iconUtils";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { API_URL } from "../config";
-import {
-  buildFhirR4Bundle,
-  buildLongFormatCsv,
-} from "../utils/fhirExport";
+import { buildFhirR4Bundle, buildLongFormatCsv } from "../utils/fhirExport";
 
 export default function ConsultationDetailScreen({ route, navigation }) {
   const { consultationId } = route.params;
@@ -26,14 +24,30 @@ export default function ConsultationDetailScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     fetchConsultation();
+
+    navigation.setOptions({
+      headerStyle: {
+        backgroundColor: "#F5F7FA",
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 0,
+      },
+      headerTintColor: "#2C3E50",
+      headerTitleStyle: {
+        fontWeight: "700",
+      },
+    });
   }, [consultationId]);
 
   const fetchConsultation = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
-      const response = await fetch(`${API_URL}/api/consultations/${consultationId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `${API_URL}/api/consultations/${consultationId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (response.ok) {
         setConsultation(await response.json());
       }
@@ -65,21 +79,25 @@ export default function ConsultationDetailScreen({ route, navigation }) {
 
   const isRedFlag = (field) => {
     if (!field) return false;
-    const t = (field.term || '').toLowerCase();
-    const l = (field.label || '').toLowerCase();
-    return t.includes("red flag") || t.includes("alerta") ||
-           l.includes("red flag") || l.includes("alerta");
+    const t = (field.term || "").toLowerCase();
+    const l = (field.label || "").toLowerCase();
+    return (
+      t.includes("red flag") ||
+      t.includes("alerta") ||
+      l.includes("red flag") ||
+      l.includes("alerta")
+    );
   };
 
   const buildExportMetadata = (consultation) => {
     const fields = consultation?.fields || [];
     const hasRedFlags = fields.some(isRedFlag);
     const fechaLimpia = consultation?.createdAt
-      ? consultation.createdAt.split('T')[0]
-      : 'export';
+      ? consultation.createdAt.split("T")[0]
+      : "export";
     const refConsulta = consultation?.id
       ? consultation.id.substring(0, 6)
-      : 'unknown';
+      : "unknown";
     return { hasRedFlags, fechaLimpia, refConsulta };
   };
 
@@ -107,7 +125,10 @@ export default function ConsultationDetailScreen({ route, navigation }) {
         .map(([key, value]) => ({
           id: key,
           label: key,
-          type: value != null && !isNaN(Number(value)) ? "loinc-number" : "snomed-text",
+          type:
+            value != null && !isNaN(Number(value))
+              ? "loinc-number"
+              : "snomed-text",
           value,
           conceptId: null,
           term: null,
@@ -119,16 +140,25 @@ export default function ConsultationDetailScreen({ route, navigation }) {
   }
 
   const loincFields =
-    consultation.fields?.filter((f) => f.terminology === "LOINC" && f.value != null) || [];
+    consultation.fields?.filter(
+      (f) => f.terminology === "LOINC" && f.value != null,
+    ) || [];
   const snomedFields =
     consultation.fields?.filter(
-      (f) => (f.terminology === "SNOMED" || !f.terminology) && f.value != null
+      (f) => (f.terminology === "SNOMED" || !f.terminology) && f.value != null,
     ) || [];
 
   const reasonField = snomedFields.find((f) => f.id === "reasonForVisit");
-  const otherSnomedFields = snomedFields.filter((f) => f.id !== "reasonForVisit");
+  const otherSnomedFields = snomedFields.filter(
+    (f) => f.id !== "reasonForVisit",
+  );
 
   const hasRedFlag = [...loincFields, ...snomedFields].some(isRedFlag);
+
+  const consultationIcon = getIconForConsultation(
+    reasonField?.value || consultation.content?.reasonForVisit || "",
+    consultation.content?.category || consultation.category || "",
+  );
 
   const renderTerminologyBadge = (field) => {
     const isLoinc = field.terminology === "LOINC";
@@ -170,7 +200,9 @@ export default function ConsultationDetailScreen({ route, navigation }) {
   const exportFile = async (content, filename, mimeType, dialogTitle, uti) => {
     const cacheDir = FileSystem.cacheDirectory;
     if (!cacheDir) {
-      console.warn("⚠️ FileSystem.cacheDirectory is null — fallback to clipboard only");
+      console.warn(
+        "⚠️ FileSystem.cacheDirectory is null — fallback to clipboard only",
+      );
       return;
     }
 
@@ -182,7 +214,9 @@ export default function ConsultationDetailScreen({ route, navigation }) {
 
     const sharingAvailable = await Sharing.isAvailableAsync();
     if (!sharingAvailable) {
-      console.warn("⚠️ Sharing.isAvailableAsync() = false — fallback to clipboard only");
+      console.warn(
+        "⚠️ Sharing.isAvailableAsync() = false — fallback to clipboard only",
+      );
       return;
     }
 
@@ -194,20 +228,27 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       const fhirBundle = buildFhirR4Bundle(consultation);
       await Clipboard.setStringAsync(fhirBundle);
 
-      const { hasRedFlags, fechaLimpia, refConsulta } = buildExportMetadata(consultation);
-      const prefix = hasRedFlags ? 'ALERT_' : '';
+      const { hasRedFlags, fechaLimpia, refConsulta } =
+        buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? "ALERT_" : "";
       const filename = `${prefix}FHIR_Doc_Ref_${refConsulta}_${fechaLimpia}.json`;
 
       await exportFile(
         fhirBundle,
         filename,
-        'application/json',
-        'Exportar FHIR R4 Bundle',
-        'public.json'
+        "application/json",
+        "Exportar FHIR R4 Bundle",
+        "public.json",
       );
     } catch (e) {
-      console.error("💥 ERROR CRÍTICO DE EXPORTACIÓN [FHIR]:", e.message, e.stack);
-      alert("Error al exportar el archivo FHIR .json. Los datos están en el portapapeles.");
+      console.error(
+        "💥 ERROR CRÍTICO DE EXPORTACIÓN [FHIR]:",
+        e.message,
+        e.stack,
+      );
+      alert(
+        "Error al exportar el archivo FHIR .json. Los datos están en el portapapeles.",
+      );
     }
   };
 
@@ -216,20 +257,27 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       const longCsv = buildLongFormatCsv(consultation);
       await Clipboard.setStringAsync(longCsv);
 
-      const { hasRedFlags, fechaLimpia, refConsulta } = buildExportMetadata(consultation);
-      const prefix = hasRedFlags ? 'ALERT_' : '';
+      const { hasRedFlags, fechaLimpia, refConsulta } =
+        buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? "ALERT_" : "";
       const filename = `${prefix}Analytics_Ref_${refConsulta}_${fechaLimpia}.csv`;
 
       await exportFile(
         longCsv,
         filename,
-        'text/csv',
-        'Exportar Analytics CSV',
-        'public.comma-separated-values-text'
+        "text/csv",
+        "Exportar Analytics CSV",
+        "public.comma-separated-values-text",
       );
     } catch (e) {
-      console.error("💥 ERROR CRÍTICO DE EXPORTACIÓN [CSV]:", e.message, e.stack);
-      alert("Error al exportar el archivo CSV .csv. Los datos están en el portapapeles.");
+      console.error(
+        "💥 ERROR CRÍTICO DE EXPORTACIÓN [CSV]:",
+        e.message,
+        e.stack,
+      );
+      alert(
+        "Error al exportar el archivo CSV .csv. Los datos están en el portapapeles.",
+      );
     }
   };
 
@@ -237,13 +285,25 @@ export default function ConsultationDetailScreen({ route, navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerBanner}>
         <View style={styles.headerIconRow}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="medkit" size={28} color="#FFFFFF" />
+          <View
+            style={[
+              styles.headerIcon,
+              { backgroundColor: consultationIcon.color + "33" },
+            ]}
+          >
+            <Ionicons
+              name={consultationIcon.name}
+              size={28}
+              color={consultationIcon.color}
+            />
           </View>
           <View style={styles.headerTextCol}>
-            <Text style={styles.headerTitle}>Resumen de Inteligencia Clínica</Text>
+            <Text style={styles.headerTitle}>
+              Resumen de Inteligencia Clínica
+            </Text>
             <Text style={styles.headerSubtitle}>
-              {formatDate(consultation.createdAt)} · {formatTime(consultation.createdAt)}
+              {formatDate(consultation.createdAt)} ·{" "}
+              {formatTime(consultation.createdAt)}
             </Text>
           </View>
         </View>
@@ -288,15 +348,24 @@ export default function ConsultationDetailScreen({ route, navigation }) {
                   style={[styles.metricCard, flag && styles.redFlagCard]}
                 >
                   <View style={styles.metricTop}>
-                    <Ionicons name="speedometer-outline" size={20} color="#1565C0" />
-                    {flag && <Ionicons name="warning" size={18} color="#D32F2F" />}
+                    <Ionicons
+                      name="speedometer-outline"
+                      size={20}
+                      color="#1565C0"
+                    />
+                    {flag && (
+                      <Ionicons name="warning" size={18} color="#D32F2F" />
+                    )}
                   </View>
                   <Text style={styles.metricValue}>{String(field.value)}</Text>
                   <Text style={styles.metricLabel}>{field.label}</Text>
                   <View style={styles.metricBadgeRow}>
                     {renderTerminologyBadge(field)}
                     {field.conceptId && (
-                      <Text style={styles.metricCode}>{field.terminology === "LOINC" ? "LOINC" : "SNOMED"}: {field.conceptId}</Text>
+                      <Text style={styles.metricCode}>
+                        {field.terminology === "LOINC" ? "LOINC" : "SNOMED"}:{" "}
+                        {field.conceptId}
+                      </Text>
                     )}
                   </View>
                 </View>
@@ -320,18 +389,26 @@ export default function ConsultationDetailScreen({ route, navigation }) {
           {otherSnomedFields.map((field, idx) => {
             const flag = isRedFlag(field);
             return (
-              <View key={field.id || idx} style={[styles.findingCard, flag && styles.redFlagCard]}>
+              <View
+                key={field.id || idx}
+                style={[styles.findingCard, flag && styles.redFlagCard]}
+              >
                 <View style={styles.findingHeader}>
                   <View style={styles.findingLeft}>
                     <Ionicons name="medical" size={16} color="#4CAF50" />
                     <Text style={styles.findingLabel}>{field.label}</Text>
                     {renderTerminologyBadge(field)}
                   </View>
-                  {flag && <Ionicons name="warning" size={18} color="#D32F2F" />}
+                  {flag && (
+                    <Ionicons name="warning" size={18} color="#D32F2F" />
+                  )}
                 </View>
                 <Text style={styles.findingValue}>{String(field.value)}</Text>
                 {field.conceptId && (
-                  <Text style={styles.findingCode}>{field.terminology === "LOINC" ? "LOINC" : "SNOMED"}: {field.conceptId}</Text>
+                  <Text style={styles.findingCode}>
+                    {field.terminology === "LOINC" ? "LOINC" : "SNOMED"}:{" "}
+                    {field.conceptId}
+                  </Text>
                 )}
               </View>
             );
@@ -340,21 +417,26 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       )}
 
       <TouchableOpacity style={styles.copyButton} onPress={handleCopyReport}>
-        <Ionicons name="copy-outline" size={20} color="#FFF" />
+        <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
         <Text style={styles.copyButtonText}>Copiar Informe Médico</Text>
       </TouchableOpacity>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.exportButtonFhirR4} onPress={handleExportFhirR4}>
-          <Ionicons name="document-text-outline" size={18} color="#FFF" />
+        <TouchableOpacity
+          style={styles.exportButtonFhirR4}
+          onPress={handleExportFhirR4}
+        >
+          <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
           <Text style={styles.exportButtonText}>FHIR R4 Bundle</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButtonLongCsv} onPress={handleExportLongCsv}>
-          <Ionicons name="analytics-outline" size={18} color="#FFF" />
+        <TouchableOpacity
+          style={styles.exportButtonLongCsv}
+          onPress={handleExportLongCsv}
+        >
+          <Ionicons name="analytics-outline" size={18} color="#FFFFFF" />
           <Text style={styles.exportButtonText}>CSV Long-Format</Text>
         </TouchableOpacity>
       </View>
-
     </ScrollView>
   );
 }
@@ -368,14 +450,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F7FA",
     gap: 12,
   },
-  errorText: { fontSize: 15, color: "#90A4AE", fontWeight: "600" },
+  errorText: {
+    fontSize: 15,
+    color: "#90A4AE",
+    fontWeight: "600",
+  },
   content: { paddingBottom: 40 },
 
   headerBanner: {
-    backgroundColor: "#2C3E50",
+    backgroundColor: "#FFFFFF",
     paddingVertical: 20,
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginTop: 10,
+    marginHorizontal: 16,
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerIconRow: {
     flexDirection: "row",
@@ -386,7 +480,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -394,12 +487,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: "#2C3E50",
     marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: "rgba(255,255,255,0.65)",
+    color: "#7F8C8D",
     fontWeight: "500",
   },
 
@@ -426,12 +519,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 18,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -592,7 +684,7 @@ const styles = StyleSheet.create({
   },
 
   copyButton: {
-    backgroundColor: "#2C3E50",
+    backgroundColor: "#4CAF50",
     flexDirection: "row",
     marginHorizontal: 16,
     marginTop: 8,

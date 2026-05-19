@@ -37,7 +37,9 @@ export default function FormListScreen({ navigation }) {
         name: "Mi Formulario (Migrado)",
         description: `Migrado desde configuración local con ${fields.length} campos`,
         fields: fields.map((f) => ({
-          id: f.id || `custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          id:
+            f.id ||
+            `custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           label: f.label || f.term || "Campo",
           type: f.type || "snomed-text",
           conceptId: f.conceptId || null,
@@ -61,7 +63,9 @@ export default function FormListScreen({ navigation }) {
 
       if (response.ok) {
         await AsyncStorage.removeItem(MIGRATION_KEY);
-        setMigrationMsg("Tu configuración local ha sido sincronizada con la nube");
+        setMigrationMsg(
+          "Tu configuración local ha sido sincronizada con la nube",
+        );
         setTimeout(() => setMigrationMsg(null), 4000);
         const data = await response.json();
         return data;
@@ -97,7 +101,7 @@ export default function FormListScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchTemplates();
-    }, [])
+    }, []),
   );
 
   const getFieldSummary = (fields) => {
@@ -128,7 +132,7 @@ export default function FormListScreen({ navigation }) {
             </Text>
           )}
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        <Ionicons name="chevron-forward" size={20} color="#7F8C8D" />
       </View>
       <View style={styles.cardFooter}>
         <Text style={styles.fieldCount}>{getFieldSummary(item.fields)}</Text>
@@ -158,13 +162,21 @@ export default function FormListScreen({ navigation }) {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTemplates(true); }} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchTemplates(true);
+            }}
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="layers-outline" size={56} color="#CFD8DC" />
+            <Ionicons name="layers-outline" size={56} color="#7F8C8D" />
             <Text style={styles.emptyTitle}>Sin plantillas</Text>
-            <Text style={styles.emptyDesc}>Crea tu primera plantilla de formulario clínico.</Text>
+            <Text style={styles.emptyDesc}>
+              Crea tu primera plantilla de formulario clínico.
+            </Text>
           </View>
         }
       />
@@ -181,8 +193,14 @@ export default function FormListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F5F7FA" },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F7FA",
+  },
   list: { padding: 16, paddingBottom: 100 },
+
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -224,24 +242,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F5F5F5",
   },
+
   fieldCount: {
     fontSize: 12,
     color: "#90A4AE",
     fontWeight: "600",
   },
+
   emptyState: {
     alignItems: "center",
     paddingVertical: 60,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#90A4AE",
-    marginTop: 16,
-  },
+  color: "#7F8C8D",
   emptyDesc: {
     fontSize: 14,
-    color: "#B0BEC5",
+    color: "#7F8C8D",
+    fontWeight: "500",
     textAlign: "center",
     marginTop: 8,
     paddingHorizontal: 40,
@@ -276,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 6,
   },
