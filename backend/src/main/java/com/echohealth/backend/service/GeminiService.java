@@ -24,6 +24,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio core encargado de la orquestación, securización y comunicación
+ * síncrona
+ * con el SDK oficial de Google GenAI mediante el modelo gemini-2.5-flash.
+ */
 @Service
 public class GeminiService {
 
@@ -34,11 +39,15 @@ public class GeminiService {
 
     private Client client;
 
+    /**
+     * Inicializa el cliente HTTP de Gemini bajo un patrón Singleton durante el
+     * ciclo de vida de Spring.
+     */
     @PostConstruct
     public void initClient() {
         if (apiKey == null || apiKey.isEmpty() || apiKey.startsWith("${")) {
             log.error("=== CRÍTICO: google.api.key NO está configurada ===");
-            log.error("Valor actual: '{}' - Revisa secrets.properties o variable de entorno GOOGLE_API_KEY", apiKey);
+            log.error("Valor actual: '{}' - Revisa secrets.properties o la variable de entorno GOOGLE_API_KEY", apiKey);
             return;
         }
         String masked = apiKey.length() > 8
@@ -51,6 +60,12 @@ public class GeminiService {
         log.info("Cliente Gemini inicializado como singleton");
     }
 
+    /**
+     * Capa defensiva de diagnóstico al arranque: intercepta el evento de
+     * inicialización del contexto
+     * para lanzar un ping automatizado y validar la vigencia de las credenciales
+     * externas.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void testGeminiConnectivity() {
         if (client == null) {
@@ -96,18 +111,16 @@ public class GeminiService {
     private static final int MIN_PAIN = 0;
     private static final int MAX_PAIN = 10;
 
-    /**
-     * Record que representa un campo destino del formulario clínico.
-     * Se construye a partir del formato pipe-separado: id|label|conceptId|term|system|type
-     */
-    private record TargetField(String id, String label, String conceptId, String term, String system, String type) {}
+    private record TargetField(String id, String label, String conceptId, String term, String system, String type) {
+    }
 
-    private record FieldInfo(String id, String label, String type, String conceptId, String term, String terminology) {}
+    private record FieldInfo(String id, String label, String type, String conceptId, String term, String terminology) {
+    }
 
     /**
-     * Construye el prompt médico dinámico que se envía a Gemini.
-     * Incluye la definición de cada campo con su código terminológico y una instrucción
-     * explícita de extracción, forzando a la IA a usar los IDs exactos de la plantilla.
+     * Compila el prompt médico dinámico inyectando el protocolo estructurado de la
+     * plantilla activa.
+     * Fuerza un comportamiento determinista mediante una tupla sintáctica estricta.
      */
     private String buildMedicalPrompt(List<TargetField> targetFields) {
         List<FieldInfo> allFields = buildAllFieldInfos(targetFields);
@@ -125,85 +138,89 @@ public class GeminiService {
                     String termStr = f.term != null ? "\"" + f.term + "\"" : "null";
                     String conceptVerified = isLoinc ? "false" : "boolean";
                     return String.format("""
-            {
-              "id": "%s",
-              "label": "%s",
-              "type": "%s",
-              "value": %s,
-              "conceptId": %s,
-              "term": %s,
-              "conceptVerified": %s,
-              "terminology": "%s"
-            }""", f.id, f.label, f.type, valueType, conceptIdStr, termStr, conceptVerified, f.terminology);
+                            {
+                              "id": "%s",
+                              "label": "%s",
+                              "type": "%s",
+                              "value": %s,
+                              "conceptId": %s,
+                              "term": %s,
+                              "conceptVerified": %s,
+                              "terminology": "%s"
+                            }""", f.id, f.label, f.type, valueType, conceptIdStr, termStr, conceptVerified,
+                            f.terminology);
                 })
                 .collect(Collectors.joining(",\n"));
 
-        return String.format("""
-        Act as an expert Medical Scribe specialized in international clinical coding (SNOMED CT and LOINC).
-        Extract clinical data from the consultation audio and return a structured JSON array.
+        return String.format(
+                """
+                        Act as an expert Medical Scribe specialized in international clinical coding (SNOMED CT and LOINC).
+                        Extract clinical data from the consultation audio and return a structured JSON array.
 
-        ============================================
-        CAMPOS A EXTRAER
-        ============================================
+                        ============================================
+                        CAMPOS A EXTRAER
+                        ============================================
 
-        %s
+                        %s
 
-        ============================================
-        INSTRUCCIONES POR CAMPO
-        ============================================
+                        ============================================
+                        INSTRUCCIONES POR CAMPO
+                        ============================================
 
-        For each field listed above:
-        1. Listen to the audio for the specific clinical concept described.
-        2. Extract the EXACT value mentioned (text, number, measurement, etc.).
-        3. Use the EXACT "id" value specified for each field. Do NOT modify or guess the id.
-        4. Use the EXACT "conceptId" value specified. Do NOT substitute with a different code.
-        5. If the concept is NOT mentioned in the audio, set "value" to null but KEEP all other metadata.
+                        For each field listed above:
+                        1. Listen to the audio for the specific clinical concept described.
+                        2. Extract the EXACT value mentioned (text, number, measurement, etc.).
+                        3. Use the EXACT "id" value specified for each field. Do NOT modify or guess the id.
+                        4. Use the EXACT "conceptId" value specified. Do NOT substitute with a different code.
+                        5. If the concept is NOT mentioned in the audio, set "value" to null but KEEP all other metadata.
 
-        ANONYMIZATION: NEVER include patient names, personal identifiers, or specific dates.
+                        ANONYMIZATION: NEVER include patient names, personal identifiers, or specific dates.
 
-        OUTPUT FORMAT (Strict JSON Array — follow this exact structure for every field):
-        [
-        %s
-        ]
+                        OUTPUT FORMAT (Strict JSON Array — follow this exact structure for every field):
+                        [
+                        %s
+                        ]
 
-        RULES:
-        1. Include EVERY field listed above in the output array, in the order shown.
-        2. If a value cannot be extracted from audio, use null for value but KEEP all other metadata (conceptId, term, terminology).
-        3. Set conceptVerified to true ONLY if terminology is SNOMED and you are confident in the mapping.
-        4. Convert units: feet->cm (x30.48), inches->cm (x2.54), lbs->kg (x0.453592).
-        5. Return valid JSON only, no additional text.
-        6. The "id" field is CRITICAL. It MUST match exactly one of the ids provided above. Do NOT invent or modify ids.
-        7. The "conceptId" field MUST match exactly the code provided. Do NOT guess codes.
-        """, extractionSection, jsonTemplate);
+                        RULES:
+                        1. Include EVERY field listed above in the output array, in the order shown.
+                        2. If a value cannot be extracted from audio, use null for value but KEEP all other metadata (conceptId, term, terminology).
+                        3. Set conceptVerified to true ONLY if terminology is SNOMED and you are confident in the mapping.
+                        4. Convert units: feet->cm (x30.48), inches->cm (x2.54), lbs->kg (x0.453592).
+                        5. Return valid JSON only, no additional text.
+                        6. The "id" field is CRITICAL. It MUST match exactly one of the ids provided above. Do NOT invent or modify ids.
+                        7. The "conceptId" field MUST match exactly the code provided. Do NOT guess codes.
+                        """,
+                extractionSection, jsonTemplate);
     }
 
     /**
-     * Genera la instrucción de extracción para un campo específico.
-     * Incluye el label, código terminológico y una orden explícita de extracción.
+     * Setea la directiva instruccional individual mapeando las propiedades
+     * semánticas del campo.
      */
     private String buildFieldExtractionInstruction(FieldInfo f) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Campo: \"%s\"\n", f.label));
-        sb.append(String.format("  ID de campo: %s\n", f.id));
-        sb.append(String.format("  Tipo: %s\n", f.type));
-        sb.append(String.format("  Terminología: %s\n", f.terminology));
+        sb.append(String.format("   ID de campo: %s\n", f.id));
+        sb.append(String.format("   Tipo: %s\n", f.type));
+        sb.append(String.format("   Terminología: %s\n", f.terminology));
 
         if (f.conceptId != null && !f.conceptId.isEmpty() && !"null".equals(f.conceptId)) {
-            sb.append(String.format("  Código: %s\n", f.conceptId));
-            sb.append(String.format("  Término clínico: %s\n", f.term));
-            sb.append(String.format("  >> Extrae el valor clínico para \"%s\" (código %s, %s). Si no se menciona en el audio, devuelve null.", f.term, f.conceptId, f.terminology));
+            sb.append(String.format("   Código: %s\n", f.conceptId));
+            sb.append(String.format("   Término clínico: %s\n", f.term));
+            sb.append(String.format(
+                    "   >> Extrae el valor clínico para \"%s\" (código %s, %s). Si no se menciona en el audio, devuelve null.",
+                    f.term, f.conceptId, f.terminology));
         } else {
-            sb.append(String.format("  >> Extrae el valor narrativo para \"%s\". Si no se menciona, devuelve null.", f.label));
+            sb.append(String.format("   >> Extrae el valor narrativo para \"%s\". Si no se menciona, devuelve null.",
+                    f.label));
         }
 
         return sb.toString();
     }
 
     /**
-     * Construye la lista de FieldInfo exclusivamente a partir de los
-     * targetFields enviados por el frontend. No hay campos base hardcodeados:
-     * el frontend es la única fuente de verdad sobre qué campos extraer.
-     * Los IDs se toman DIRECTAMENTE del targetField, garantizando estabilidad.
+     * Resuelve dinámicamente los metadatos de los campos basándose en los
+     * parámetros inyectados por el cliente.
      */
     private List<FieldInfo> buildAllFieldInfos(List<TargetField> customTargets) {
         List<FieldInfo> fields = new ArrayList<>();
@@ -215,7 +232,8 @@ public class GeminiService {
                     String id = tf.id();
                     type = ("height".equals(id) || "weight".equals(id) || "pulse".equals(id)
                             || "oxygenSaturation".equals(id) || "painIntensity".equals(id))
-                            ? "loinc-number" : "loinc-text";
+                                    ? "loinc-number"
+                                    : "loinc-text";
                 } else {
                     type = "snomed-text";
                 }
@@ -231,13 +249,12 @@ public class GeminiService {
     }
 
     /**
-     * Parsea los targetFields recibidos como strings pipe-separados.
-     * Formato esperado: id|label|conceptId|term|system|type
-     * Si el formato tiene menos de 6 partes, intenta compatibilidad hacia atrás
-     * con formatos legacy (5 partes y 3 partes).
+     * Parsea la tupla serializada multipart enviada por el cliente React Native,
+     * abstrayendo delimitadores pipe.
      */
     private List<TargetField> parseTargetFields(List<String> raw) {
-        if (raw == null) return List.of();
+        if (raw == null)
+            return List.of();
         return raw.stream().map(s -> {
             String[] parts = s.split("\\|", 6);
             if (parts.length >= 6) {
@@ -253,19 +270,16 @@ public class GeminiService {
         }).collect(Collectors.toList());
     }
 
-    /**
-     * Sanitiza un conceptId para usarlo como parte de un ID de campo.
-     * Ej: "8867-4" → "8867_4", "21522001" → "21522001"
-     */
     private String sanitizeConceptId(String conceptId) {
-        if (conceptId == null) return "unknown";
+        if (conceptId == null)
+            return "unknown";
         return conceptId.replaceAll("[^a-zA-Z0-9_]", "_").replaceAll("_+", "_");
     }
 
     /**
-     * Punto de entrada principal para el análisis de audio.
-     * Envía el audio + prompt a Gemini 3 Flash y procesa la respuesta.
-     */ 
+     * Punto de entrada principal: procesa los flujos binarios multipart y gestiona
+     * el pipeline semántico.
+     */
     public String analyzeAudio(MultipartFile file, List<String> targetFields) {
         if (client == null) {
             log.error("Cliente Gemini no inicializado - apiKey es null o inválida");
@@ -275,7 +289,7 @@ public class GeminiService {
         try {
             String mimeType = resolveMimeType(file);
 
-            // PASO 1: Audio diagnostics
+            // Diagnóstico y validación del buffer binario de entrada
             log.debug("Audio: {} ({} bytes, {})", file.getOriginalFilename(), file.getSize(), file.getContentType());
             log.debug("MimeType resuelto: {}", mimeType);
             if (file.isEmpty()) {
@@ -286,12 +300,9 @@ public class GeminiService {
             log.debug("Campos destino: {} [{}]", parsed.size(),
                     parsed.stream().map(TargetField::id).collect(Collectors.joining(", ")));
 
-
-            // PASO 2: Build prompt
             String medicalPrompt = buildMedicalPrompt(parsed);
             log.debug("Prompt generado: {} caracteres", medicalPrompt.length());
 
-            // PASO 3: Prepare content
             byte[] audioBytes = file.getBytes();
             log.debug("Audio leído: {} bytes", audioBytes.length);
 
@@ -312,7 +323,6 @@ public class GeminiService {
                     .responseMimeType("application/json")
                     .build();
 
-            // PASO 4: Gemini API call
             log.info("Enviando a Gemini (modelo: gemini-2.5-flash, {} campos)...", parsed.size());
 
             long startTime = System.currentTimeMillis();
@@ -321,19 +331,16 @@ public class GeminiService {
             long elapsed = System.currentTimeMillis() - startTime;
             log.info("Respuesta de Gemini recibida en {} ms", elapsed);
 
-            // PASO 5: Raw response
             String rawResponse = response.text();
             if (rawResponse != null) {
                 log.info("Respuesta cruda ({} chars): >>>{}<<<", rawResponse.length(), rawResponse);
             } else {
-                log.error("¡RESPUESTA DE GEMINI ES NULL!");
-                log.error("Posibles causas: (1) API key inválida/vencida, (2) Cuota agotada (429),");
-                log.error("  (3) Content blocked por safety settings, (4) Error interno de Gemini");
+                log.error("¡RESPUESTA DE GEMINI ES NULL! Revisa cuotas (429) o bloqueos de Safety Settings");
             }
 
-            // PASO 6: Processing & validation
+            // Capa defensiva de limpieza, normalización sintáctica y validación fisiológica
             String cleanedJson = cleanJsonResponse(rawResponse, parsed);
-            log.debug("JSON después de cleanJsonResponse ({} chars): {}", 
+            log.debug("JSON después de cleanJsonResponse ({} chars): {}",
                     cleanedJson != null ? cleanedJson.length() : 0, cleanedJson);
 
             String validatedJson = validateFieldIds(cleanedJson, parsed);
@@ -351,7 +358,6 @@ public class GeminiService {
             log.error("Tipo excepción: {}", errorType);
             log.error("Mensaje completo: {}", errorMsg);
             log.error("Stacktrace:", e);
-            log.error("Causa: {}", e.getCause() != null ? e.getCause().getMessage() : "N/A");
             String userMessage = String.format("Error de API Gemini: %s", errorMsg);
             List<TargetField> parsed = parseTargetFields(targetFields);
             return buildErrorResponse(parsed, userMessage);
@@ -368,10 +374,6 @@ public class GeminiService {
         }
     }
 
-    /**
-     * Resuelve el MIME type del archivo de audio.
-     * Si el content type es genérico o nulo, asume audio/m4a.
-     */
     private String resolveMimeType(MultipartFile file) {
         String mimeType = file.getContentType();
         if (mimeType == null || mimeType.isEmpty() || mimeType.equals("application/octet-stream")) {
@@ -381,8 +383,8 @@ public class GeminiService {
     }
 
     /**
-     * Limpia la respuesta de Gemini eliminando marcadores de código
-     * y extrayendo exclusivamente el array JSON.
+     * Purga la respuesta eliminando los delimitadores de código markdown generados
+     * por el LLM.
      */
     private String cleanJsonResponse(String rawResponse, List<TargetField> targetFields) {
         if (rawResponse == null || rawResponse.isEmpty()) {
@@ -393,15 +395,12 @@ public class GeminiService {
         String trimmed = rawResponse.trim();
 
         if (trimmed.startsWith("```json")) {
-            log.info("cleanJsonResponse: eliminando marcador ```json del inicio");
             trimmed = trimmed.substring(7);
         } else if (trimmed.startsWith("```")) {
-            log.info("cleanJsonResponse: eliminando marcador ``` del inicio");
             trimmed = trimmed.substring(3);
         }
 
         if (trimmed.endsWith("```")) {
-            log.info("cleanJsonResponse: eliminando marcador ``` del final");
             trimmed = trimmed.substring(0, trimmed.length() - 3);
         }
 
@@ -411,18 +410,15 @@ public class GeminiService {
         int lastBracket = trimmed.lastIndexOf(']');
 
         if (firstBracket == -1 || lastBracket == -1) {
-            log.warn("cleanJsonResponse: no se encontró array JSON delimitado por [ ]");
-            log.warn("cleanJsonResponse: contenido tras limpieza ({} chars): >>>{}<<<",
-                    trimmed.length(), trimmed);
+            log.warn("cleanJsonResponse: no se encontró un array JSON delimitado por [ ]");
             return buildFallbackResponse(targetFields);
         }
 
         String jsonArray = trimmed.substring(firstBracket, lastBracket + 1);
-        log.info("cleanJsonResponse: array JSON extraído ({} chars, índices {}-{})",
-                jsonArray.length(), firstBracket, lastBracket);
+        log.info("cleanJsonResponse: array JSON extraído con éxito");
 
         if (!jsonArray.startsWith("[") || !jsonArray.endsWith("]")) {
-            log.warn("cleanJsonResponse: el extracto no es un array válido");
+            log.warn("cleanJsonResponse: estructura de array de tokens no válida");
             return buildFallbackResponse(targetFields);
         }
 
@@ -430,13 +426,12 @@ public class GeminiService {
     }
 
     /**
-     * Valida que los IDs devueltos por Gemini coincidan con los IDs solicitados.
-     * Si algún ID no coincide, se reemplaza por el ID correcto basado en la posición
-     * o en el conceptId. Esto garantiza que el mapeo plantilla → IA → persistencia
-     * sea estable y predecible.
+     * Asegura la concordancia posicional de los IDs devueltos frente a los
+     * inyectados originalmente.
      */
     private String validateFieldIds(String json, List<TargetField> targetFields) {
-        if (targetFields == null || targetFields.isEmpty()) return json;
+        if (json == null || targetFields == null || targetFields.isEmpty())
+            return json;
 
         try {
             List<FieldInfo> expectedFields = buildAllFieldInfos(targetFields);
@@ -465,29 +460,34 @@ public class GeminiService {
                     matcher.appendReplacement(sb, replacement);
                     matchIndex++;
                 }
-                matcher.appendTail(sb);
+                matcher.appendTail(sb); // <-- Corregido con el método oficial de la JDK
                 json = sb.toString();
             }
 
             return json;
         } catch (Exception e) {
-            log.error("Error en validación de IDs: {}", e.getMessage());
+            log.error("Error en validación posicional de IDs: {}", e.getMessage());
             return json;
         }
     }
 
     /**
-     * Valida que los valores numéricos estén dentro de rangos clínicos aceptables.
-     * Si un valor está fuera de rango, se fuerza a null para evitar datos aberrantes.
+     * Valida de forma estricta los límites biológicos cuantitativos mapeados por la
+     * capa de inferencia.
      */
     private String validateClinicalRanges(String json) {
         try {
             String validated = json;
-            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.HEIGHT_ID, MIN_HEIGHT, MAX_HEIGHT, true);
-            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.WEIGHT_ID, MIN_WEIGHT, MAX_WEIGHT, false);
-            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.PULSE_ID, MIN_PULSE, MAX_PULSE, true);
-            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_ID, MIN_SPO2, MAX_SPO2, true);
-            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.PAIN_INTENSITY_ID, MIN_PAIN, MAX_PAIN, true);
+            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.HEIGHT_ID, MIN_HEIGHT,
+                    MAX_HEIGHT, true);
+            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.WEIGHT_ID, MIN_WEIGHT,
+                    MAX_WEIGHT, false);
+            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.PULSE_ID, MIN_PULSE, MAX_PULSE,
+                    true);
+            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.OXYGEN_SATURATION_ID, MIN_SPO2,
+                    MAX_SPO2, true);
+            validated = validateFieldInRange(validated, ClinicalConstants.FieldDefaults.PAIN_INTENSITY_ID, MIN_PAIN,
+                    MAX_PAIN, true);
             return validated;
         } catch (Exception e) {
             log.error("Error en validación de rangos clínicos: {}", e.getMessage());
@@ -497,13 +497,11 @@ public class GeminiService {
 
     private String validateFieldInRange(String json, String fieldId, double minVal, double maxVal, boolean isInteger) {
         String valueRegex = String.format(
-            "\"value\"\\s*:\\s*(%s)",
-            isInteger ? "(\\d+)" : "([\\d.]+)"
-        );
+                "\"value\"\\s*:\\s*(%s)",
+                isInteger ? "(\\d+)" : "([\\d.]+)");
 
         String fieldRegex = String.format(
-            "\"id\"\\s*:\\s*\"%s\"", fieldId
-        );
+                "\"id\"\\s*:\\s*\"%s\"", fieldId);
 
         Pattern fieldPattern = Pattern.compile(fieldRegex);
         Matcher fieldMatcher = fieldPattern.matcher(json);
@@ -511,9 +509,11 @@ public class GeminiService {
         while (fieldMatcher.find()) {
             int fieldStart = fieldMatcher.start();
             int objectStart = json.lastIndexOf('{', fieldStart);
-            if (objectStart < 0) objectStart = 0;
+            if (objectStart < 0)
+                objectStart = 0;
             int objectEnd = json.indexOf('}', fieldStart);
-            if (objectEnd < 0) objectEnd = json.length();
+            if (objectEnd < 0)
+                objectEnd = json.length();
 
             String objectStr = json.substring(objectStart, objectEnd + 1);
 
@@ -525,7 +525,7 @@ public class GeminiService {
                 double value = Double.parseDouble(valueStr);
 
                 if (value < minVal || value > maxVal) {
-                    log.warn("Valor fuera de rango para {}: {}. Forzando a null", fieldId, value);
+                    log.warn("Valor fuera de rango biológico para {}: {}. Degradando a null", fieldId, value);
                     int absValueStart = objectStart + valueMatcher.start(1);
                     int absValueEnd = objectStart + valueMatcher.end(1);
                     json = json.substring(0, absValueStart) + "null" + json.substring(absValueEnd);
@@ -537,9 +537,9 @@ public class GeminiService {
     }
 
     /**
-     * Construye una respuesta de fallback cuando Gemini falla.
-     * Devuelve un array JSON con todos los campos solicitados pero con value=null,
-     * permitiendo que el flujo continúe sin interrupción.
+     * Fallback estratégico ante interrupciones de red: reconstruye la matriz con
+     * valores nulos
+     * salvaguardando la integridad estructural del árbol dinámico del frontend.
      */
     private String buildFallbackResponse(List<TargetField> targetFields) {
         log.warn("Devolviendo respuesta de fallback con campos vacíos");
@@ -552,9 +552,8 @@ public class GeminiService {
             String conceptIdStr = f.conceptId != null ? "\"" + f.conceptId + "\"" : "null";
             String termStr = f.term != null ? "\"" + f.term + "\"" : "null";
             sb.append(String.format(
-                "  {\"id\": \"%s\", \"label\": \"%s\", \"type\": \"%s\", \"value\": null, \"conceptId\": %s, \"term\": %s, \"conceptVerified\": false, \"terminology\": \"%s\"}",
-                f.id, f.label, f.type, conceptIdStr, termStr, f.terminology
-            ));
+                    "  {\"id\": \"%s\", \"label\": \"%s\", \"type\": \"%s\", \"value\": null, \"conceptId\": %s, \"term\": %s, \"conceptVerified\": false, \"terminology\": \"%s\"}",
+                    f.id, f.label, f.type, conceptIdStr, termStr, f.terminology));
             if (i < allFields.size() - 1) {
                 sb.append(",\n");
             } else {
@@ -567,9 +566,8 @@ public class GeminiService {
     }
 
     /**
-     * Construye una respuesta de error estructurada cuando la API de Gemini
-     * devuelve un error HTTP (401, 403, 429, etc.). Incluye el mensaje de error
-     * de Google en un campo _error para que el frontend pueda mostrarlo.
+     * Compila un payload estructurado inyectando la firma del error HTTP de Google
+     * para mitigar fallos opacos en el flujo cliente.
      */
     private String buildErrorResponse(List<TargetField> targetFields, String errorMessage) {
         log.error("Devolviendo respuesta de error al frontend: {}", errorMessage);
@@ -582,9 +580,8 @@ public class GeminiService {
             String conceptIdStr = f.conceptId != null ? "\"" + f.conceptId + "\"" : "null";
             String termStr = f.term != null ? "\"" + f.term + "\"" : "null";
             sb.append(String.format(
-                "  {\"id\": \"%s\", \"label\": \"%s\", \"type\": \"%s\", \"value\": null, \"conceptId\": %s, \"term\": %s, \"conceptVerified\": false, \"terminology\": \"%s\"}",
-                f.id, f.label, f.type, conceptIdStr, termStr, f.terminology
-            ));
+                    "  {\"id\": \"%s\", \"label\": \"%s\", \"type\": \"%s\", \"value\": null, \"conceptId\": %s, \"term\": %s, \"conceptVerified\": false, \"terminology\": \"%s\"}",
+                    f.id, f.label, f.type, conceptIdStr, termStr, f.terminology));
             if (i < allFields.size() - 1) {
                 sb.append(",\n");
             } else {
@@ -598,12 +595,12 @@ public class GeminiService {
     }
 
     private String escapeJson(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
     }
-
 }

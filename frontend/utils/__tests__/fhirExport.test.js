@@ -1,18 +1,7 @@
-import {
-  buildFhirR4Bundle,
-  buildLongFormatCsv,
-} from "../fhirExport";
+import { buildFhirR4Bundle, buildLongFormatCsv } from "../fhirExport";
 
-// =============================================================================
-// DATA MOCK — Consulta clínica dinámica con 5 campos de prueba extremos
-// =============================================================================
-// Casos cubiertos:
-//   1. reasonForVisit — texto libre sin códigos (comprueba comas escapadas)
-//   2. LOINC numérico — altura 8302-2, valueQuantity con UCUM
-//   3. Panel compuesto — PA 85354-9 "120/80" → component systolic/diastolic
-//   4. Hallazgo SNOMED — 21522001 semanticTag="finding" → Condition
-//   5. Valor null — peso 29463-7 value=null → debe excluirse
-
+// Entorno de simulación: objeto dinámico basado en el patrón conceptual abstracto EAV.
+// Escenarios límite: texto libre, variables cuantitativas UCUM, paneles compuestos, hallazgos semánticos y control de nulos.
 const mockConsultation = {
   id: "test-cons-123",
   userId: "dr_test_01",
@@ -71,15 +60,12 @@ const mockConsultation = {
   ],
 };
 
-// =============================================================================
-// buildFhirR4Bundle (Bundle FHIR R4 tipo document)
-// =============================================================================
-
+// Pruebas de conformidad y transformación arquitectónica a grafos HL7 FHIR R4 Document.
 describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
   const parsed = JSON.parse(buildFhirR4Bundle(mockConsultation));
   const composition = parsed.entry[0].resource;
   const patientEntry = parsed.entry.find(
-    (e) => e.resource.resourceType === "Patient"
+    (e) => e.resource.resourceType === "Patient",
   );
   const patientUuid = composition.subject.reference;
   const allResources = parsed.entry.slice(1).map((e) => e.resource);
@@ -90,7 +76,7 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(parsed.type).toBe("document");
     expect(parsed.identifier.value).toBe("test-cons-123");
     expect(parsed.identifier.system).toBe(
-      "https://echohealth.app/consultations"
+      "https://echohealth.app/consultations",
     );
   });
 
@@ -105,23 +91,19 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(composition.text).toBeDefined();
     expect(composition.text.status).toBe("generated");
     expect(composition.text.div).toContain(
-      "EchoHealth Clinical Summary Composition"
+      "EchoHealth Clinical Summary Composition",
     );
-    expect(typeof composition.subject).toBe('object');
+    expect(typeof composition.subject).toBe("object");
     expect(composition.subject.reference).toMatch(/^urn:uuid:/);
     expect(composition.subject.reference).toBe(patientUuid);
     expect(patientEntry.fullUrl).toBe(patientUuid);
     expect(patientEntry.resource.text).toBeDefined();
     expect(patientEntry.resource.text.status).toBe("generated");
     expect(patientEntry.resource.text.div).toContain(
-      "Anonymized Patient Resource"
+      "Anonymized Patient Resource",
     );
-    expect(patientEntry.resource.identifier[0].value).toBe(
-      "dr_test_01"
-    );
-    expect(composition.subject.display).toBe(
-      "Anonymous Patient Reference"
-    );
+    expect(patientEntry.resource.identifier[0].value).toBe("dr_test_01");
+    expect(composition.subject.display).toBe("Anonymous Patient Reference");
     expect(composition.confidentiality).toBeUndefined();
   });
 
@@ -133,28 +115,28 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(composition.section.length).toBe(3);
 
     const motivoSection = composition.section.find(
-      (s) => s.title === "Motivo de la consulta"
+      (s) => s.title === "Motivo de la consulta",
     );
     expect(motivoSection.entry.length).toBe(1);
     expect(motivoSection.entry[0].reference).toMatch(/^urn:uuid:/);
 
     const medicionesSection = composition.section.find(
-      (s) => s.title === "Mediciones y Tests"
+      (s) => s.title === "Mediciones y Tests",
     );
     expect(medicionesSection.entry.length).toBe(2);
     medicionesSection.entry.forEach((e) =>
-      expect(e.reference).toMatch(/^urn:uuid:/)
+      expect(e.reference).toMatch(/^urn:uuid:/),
     );
 
     const hallazgosSection = composition.section.find(
-      (s) => s.title === "Hallazgos Clínicos"
+      (s) => s.title === "Hallazgos Clínicos",
     );
     expect(hallazgosSection.entry.length).toBe(1);
     expect(hallazgosSection.entry[0].reference).toMatch(/^urn:uuid:/);
 
     const allFullUrls = parsed.entry.map((e) => e.fullUrl);
     const referencedIds = composition.section.flatMap((s) =>
-      s.entry.map((e) => e.reference)
+      s.entry.map((e) => e.reference),
     );
     for (const ref of referencedIds) {
       expect(allFullUrls).toContain(ref);
@@ -168,32 +150,32 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(reasonObs.text).toBeDefined();
     expect(reasonObs.text.status).toBe("generated");
     expect(reasonObs.text.div).toContain(
-      "Chief complaint Narrative - Reported"
+      "Chief complaint Narrative - Reported",
     );
     expect(reasonObs.text.div).toContain(
-      "Paciente con dolor lumbar, irradiado a pierna derecha"
+      "Paciente con dolor lumbar, irradiado a pierna derecha",
     );
     expect(reasonObs.code.coding[0].system).toBe("http://loinc.org");
     expect(reasonObs.code.coding[0].code).toBe("10154-3");
     expect(reasonObs.code.coding[0].display).toBe(
-      "Chief complaint Narrative - Reported"
+      "Chief complaint Narrative - Reported",
     );
     expect(reasonObs.subject.reference).toBe(patientUuid);
     expect(reasonObs.subject.display).toBe("Anonymous Patient");
     expect(reasonObs.performer).toBeDefined();
     expect(reasonObs.performer[0].display).toBe(
-      "EchoHealth AI Clinical Assistant"
+      "EchoHealth AI Clinical Assistant",
     );
     expect(reasonObs.category).toBeUndefined();
     expect(reasonObs.valueString).toBe(
-      "Paciente con dolor lumbar, irradiado a pierna derecha"
+      "Paciente con dolor lumbar, irradiado a pierna derecha",
     );
     expect(reasonObs.valueCodeableConcept).toBeUndefined();
   });
 
   test("T4 — Mapeo de Cantidades UCUM: height valueQuantity con cm", () => {
     const heightObs = resources.find(
-      (r) => r.id === "obs-1" && r.resourceType === "Observation"
+      (r) => r.id === "obs-1" && r.resourceType === "Observation",
     );
     expect(heightObs).toBeDefined();
     expect(heightObs.text).toBeDefined();
@@ -204,24 +186,20 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(heightObs.subject.reference).toBe(patientUuid);
     expect(heightObs.performer).toBeDefined();
     expect(heightObs.performer[0].display).toBe(
-      "EchoHealth AI Clinical Assistant"
+      "EchoHealth AI Clinical Assistant",
     );
     expect(heightObs.category).toBeDefined();
     expect(heightObs.category[0].coding[0].code).toBe("vital-signs");
     expect(heightObs.valueQuantity).toBeDefined();
     expect(heightObs.valueQuantity.value).toBe(175);
     expect(heightObs.valueQuantity.unit).toBe("cm");
-    expect(heightObs.valueQuantity.system).toBe(
-      "http://unitsofmeasure.org"
-    );
+    expect(heightObs.valueQuantity.system).toBe("http://unitsofmeasure.org");
     expect(heightObs.valueQuantity.code).toBe("cm");
   });
 
   test("T5 — Tratamiento de Panel Compuesto: PA 85354-9 con 2 componentes", () => {
     const bpObs = resources.find(
-      (r) =>
-        r.id === "obs-2" &&
-        r.code.coding[0].code === "85354-9"
+      (r) => r.id === "obs-2" && r.code.coding[0].code === "85354-9",
     );
     expect(bpObs).toBeDefined();
     expect(bpObs.resourceType).toBe("Observation");
@@ -230,9 +208,7 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(bpObs.text.div).toContain("Presión arterial");
     expect(bpObs.subject.reference).toBe(patientUuid);
     expect(bpObs.performer).toBeDefined();
-    expect(bpObs.performer[0].display).toBe(
-      "EchoHealth AI Clinical Assistant"
-    );
+    expect(bpObs.performer[0].display).toBe("EchoHealth AI Clinical Assistant");
     expect(bpObs.category).toBeDefined();
     expect(bpObs.category[0].coding[0].code).toBe("vital-signs");
     expect(bpObs.component).toBeDefined();
@@ -241,45 +217,33 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     const systolic = bpObs.component[0];
     expect(systolic.code.coding[0].code).toBe("8480-6");
     expect(systolic.code.coding[0].system).toBe("http://loinc.org");
-    expect(systolic.code.coding[0].display).toBe(
-      "Systolic blood pressure"
-    );
+    expect(systolic.code.coding[0].display).toBe("Systolic blood pressure");
     expect(systolic.valueQuantity.value).toBe(120);
     expect(systolic.valueQuantity.unit).toBe("mmHg");
-    expect(systolic.valueQuantity.system).toBe(
-      "http://unitsofmeasure.org"
-    );
+    expect(systolic.valueQuantity.system).toBe("http://unitsofmeasure.org");
     expect(systolic.valueQuantity.code).toBe("mm[Hg]");
 
     const diastolic = bpObs.component[1];
     expect(diastolic.code.coding[0].code).toBe("8462-4");
-    expect(diastolic.code.coding[0].display).toBe(
-      "Diastolic blood pressure"
-    );
+    expect(diastolic.code.coding[0].display).toBe("Diastolic blood pressure");
     expect(diastolic.valueQuantity.value).toBe(80);
   });
 
   test("T6 — Tratamiento de Hallazgos SNOMED: finding → Condition", () => {
-    const condition = resources.find(
-      (r) => r.resourceType === "Condition"
-    );
+    const condition = resources.find((r) => r.resourceType === "Condition");
     expect(condition).toBeDefined();
     expect(condition.id).toBe("condition-3");
     expect(condition.subject.reference).toBe(patientUuid);
     expect(condition.code.coding[0].code).toBe("21522001");
-    expect(condition.code.coding[0].system).toBe(
-      "http://snomed.info/sct"
-    );
+    expect(condition.code.coding[0].system).toBe("http://snomed.info/sct");
     expect(condition.code.coding[0].display).toBe("Dolor abdominal");
     expect(condition.clinicalStatus.coding[0].code).toBe("active");
     expect(condition.clinicalStatus.coding[0].system).toBe(
-      "http://terminology.hl7.org/CodeSystem/condition-clinical"
+      "http://terminology.hl7.org/CodeSystem/condition-clinical",
     );
-    expect(condition.verificationStatus.coding[0].code).toBe(
-      "confirmed"
-    );
+    expect(condition.verificationStatus.coding[0].code).toBe("confirmed");
     expect(condition.verificationStatus.coding[0].system).toBe(
-      "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status",
     );
     expect(condition.note).toBeDefined();
     expect(condition.note[0].text).toBe("Leve");
@@ -290,24 +254,17 @@ describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
     expect(composition.resourceType).toBe("Composition");
     expect(resources.length).toBe(4);
 
-    const conceptIds = resources.map(
-      (r) => r.code?.coding?.[0]?.code || r.id
-    );
+    const conceptIds = resources.map((r) => r.code?.coding?.[0]?.code || r.id);
     expect(conceptIds).not.toContain("29463-7");
 
     const weightResource = resources.find(
-      (r) =>
-        r.code?.coding?.[0]?.code === "29463-7" ||
-        r.id === "condition-4"
+      (r) => r.code?.coding?.[0]?.code === "29463-7" || r.id === "condition-4",
     );
     expect(weightResource).toBeUndefined();
   });
 });
 
-// =============================================================================
-// NUEVO — buildLongFormatCsv (CSV transaccional formato largo)
-// =============================================================================
-
+// Pruebas de consistencia de la matriz Big Data transaccional (Formato Largo EAV).
 function parseCsvRow(row) {
   const fields = [];
   let current = "";
@@ -341,7 +298,7 @@ describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () 
 
   test("T1 — Integridad de la Cabecera: columnas estándar", () => {
     expect(lines[0]).toBe(
-      "fecha,consulta_id,medico_id,campo_id,terminologia,codigo_concepto,termino_concepto,valor_extraido,unidad,tipo_semantico"
+      "fecha,consulta_id,medico_id,campo_id,terminologia,codigo_concepto,termino_concepto,valor_extraido,unidad,tipo_semantico",
     );
   });
 
@@ -355,7 +312,7 @@ describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () 
 
   test("T3 — Inyección de Unidades: LOINC cm, SNOMED vacío", () => {
     const loincRows = dataRows.filter(
-      (r) => r[4] === "LOINC" && r[5] === "8302-2"
+      (r) => r[4] === "LOINC" && r[5] === "8302-2",
     );
     expect(loincRows.length).toBe(1);
     expect(loincRows[0][8]).toBe("cm");
@@ -367,20 +324,16 @@ describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () 
   });
 
   test("T4 — Escapado de Caracteres: comas internas entre comillas dobles", () => {
-    const reasonRow = dataRows.find(
-      (r) => r[3] === "reasonForVisit"
-    );
+    const reasonRow = dataRows.find((r) => r[3] === "reasonForVisit");
     expect(reasonRow).toBeDefined();
 
-    const rawReasonLine = lines.find((l) =>
-      l.includes("reasonForVisit")
-    );
+    const rawReasonLine = lines.find((l) => l.includes("reasonForVisit"));
     expect(rawReasonLine).toMatch(
-      /"Paciente con dolor lumbar, irradiado a pierna derecha"/
+      /"Paciente con dolor lumbar, irradiado a pierna derecha"/,
     );
 
     expect(reasonRow[7]).toBe(
-      "Paciente con dolor lumbar, irradiado a pierna derecha"
+      "Paciente con dolor lumbar, irradiado a pierna derecha",
     );
   });
 
@@ -400,7 +353,8 @@ describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () 
 
     const bundleStr = buildFhirR4Bundle(corrupted);
     const bundle = JSON.parse(bundleStr);
-    const resources = bundle.entry.slice(1)
+    const resources = bundle.entry
+      .slice(1)
       .filter((e) => e.resource.resourceType !== "Patient")
       .map((e) => e.resource);
     expect(resources.length).toBe(4);

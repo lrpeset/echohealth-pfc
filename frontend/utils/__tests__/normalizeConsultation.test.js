@@ -1,15 +1,16 @@
-import { normalizeConsultation, extractReasonForVisit } from "../normalizeConsultation";
+import {
+  normalizeConsultation,
+  extractReasonForVisit,
+} from "../normalizeConsultation";
 
-// =============================================================================
-// TEST SUITE: Normalizador de Consultas Clínicas
-// =============================================================================
-// CRÍTICO PARA SEGURIDAD DEL PACIENTE:
-//   Si el normalizador falla, la UI puede mostrar datos clínicos incorrectos
-//   o peor aún, ocultar campos con valor null que el médico debería rellenar.
-//   Estos tests garantizan que cualquier formato legacy se convierta sin pérdida.
+/**
+ * Suite de pruebas unitarias para el motor de normalización de consultas clínicas.
+ * Garantiza la convergencia determinista de esquemas estructurados y planos (Legacy),
+ * blindando la integridad de los datos ante mutaciones de la UI y protegiendo los
+ * flujos transaccionales frente a estados nulos o indefinidos.
+ */
 
 describe("normalizeConsultation — Test de Convergencia (Legacy → FHIR)", () => {
-
   test("should_convert_reasonForVisit_height_weight_pulse_to_structured_fields_when_input_is_legacy_flat", () => {
     const legacy = {
       reasonForVisit: "Paciente con dolor lumbar",
@@ -68,7 +69,6 @@ describe("normalizeConsultation — Test de Convergencia (Legacy → FHIR)", () 
 });
 
 describe("normalizeConsultation — Test de Integridad (no sobrescribe FHIR-Ready)", () => {
-
   test("should_not_overwrite_existing_conceptId_when_input_is_already_structured", () => {
     const fhirReady = {
       fields: [
@@ -97,9 +97,21 @@ describe("normalizeConsultation — Test de Integridad (no sobrescribe FHIR-Read
 
   test("should_handle_array_of_fields_input_without_data_loss", () => {
     const geminiArray = [
-      { id: "reasonForVisit", label: "Motivo de la visita", type: "snomed-text", value: "Dolor de cabeza" },
-      { id: "custom_21522001", label: "Dolor abdominal", type: "snomed-text", value: "Leve",
-        conceptId: "21522001", term: "Dolor abdominal", terminology: "SNOMED" },
+      {
+        id: "reasonForVisit",
+        label: "Motivo de la visita",
+        type: "snomed-text",
+        value: "Dolor de cabeza",
+      },
+      {
+        id: "custom_21522001",
+        label: "Dolor abdominal",
+        type: "snomed-text",
+        value: "Leve",
+        conceptId: "21522001",
+        term: "Dolor abdominal",
+        terminology: "SNOMED",
+      },
     ];
 
     const result = normalizeConsultation(geminiArray);
@@ -114,9 +126,28 @@ describe("normalizeConsultation — Test de Integridad (no sobrescribe FHIR-Read
   test("should_preserve_4_base_fields_when_input_has_extra_custom_fields", () => {
     const withCustom = {
       fields: [
-        { id: "reasonForVisit", label: "Motivo", type: "snomed-text", value: "Chequeo" },
-        { id: "height", label: "Altura", type: "loinc-number", value: 170, conceptId: "8302-2", terminology: "LOINC" },
-        { id: "custom_8867_4", label: "FC", type: "loinc-number", value: 75, conceptId: "8867-4", terminology: "LOINC" },
+        {
+          id: "reasonForVisit",
+          label: "Motivo",
+          type: "snomed-text",
+          value: "Chequeo",
+        },
+        {
+          id: "height",
+          label: "Altura",
+          type: "loinc-number",
+          value: 170,
+          conceptId: "8302-2",
+          terminology: "LOINC",
+        },
+        {
+          id: "custom_8867_4",
+          label: "FC",
+          type: "loinc-number",
+          value: 75,
+          conceptId: "8867-4",
+          terminology: "LOINC",
+        },
       ],
     };
 
@@ -128,7 +159,6 @@ describe("normalizeConsultation — Test de Integridad (no sobrescribe FHIR-Read
 });
 
 describe("normalizeConsultation — Test de Null-Safety", () => {
-
   test("should_return_empty_fields_when_input_is_null", () => {
     const result = normalizeConsultation(null);
 
@@ -147,9 +177,7 @@ describe("normalizeConsultation — Test de Null-Safety", () => {
 
   test("should_handle_partial_field_data_gracefully", () => {
     const partial = {
-      fields: [
-        { id: "reasonForVisit", value: "Dolor" },
-      ],
+      fields: [{ id: "reasonForVisit", value: "Dolor" }],
     };
 
     const result = normalizeConsultation(partial);
@@ -161,12 +189,9 @@ describe("normalizeConsultation — Test de Null-Safety", () => {
 });
 
 describe("extractReasonForVisit — Test de Búsqueda Multi-Formato", () => {
-
   test("should_extract_from_structured_fields_array", () => {
     const data = {
-      fields: [
-        { id: "reasonForVisit", value: "Paciente con fiebre" },
-      ],
+      fields: [{ id: "reasonForVisit", value: "Paciente con fiebre" }],
     };
     expect(extractReasonForVisit(data)).toBe("Paciente con fiebre");
   });
