@@ -15,7 +15,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { API_URL } from "../config";
 import {
-  buildFhirR5Bundle,
+  buildFhirR4Bundle,
   buildLongFormatCsv,
 } from "../utils/fhirExport";
 
@@ -189,9 +189,9 @@ export default function ConsultationDetailScreen({ route, navigation }) {
     await Sharing.shareAsync(fileUri, { mimeType, dialogTitle, UTI: uti });
   };
 
-  const handleExportFhirR5 = async () => {
+  const handleExportFhirR4 = async () => {
     try {
-      const fhirBundle = buildFhirR5Bundle(consultation);
+      const fhirBundle = buildFhirR4Bundle(consultation);
       await Clipboard.setStringAsync(fhirBundle);
 
       const { hasRedFlags, fechaLimpia, refConsulta } = buildExportMetadata(consultation);
@@ -202,7 +202,7 @@ export default function ConsultationDetailScreen({ route, navigation }) {
         fhirBundle,
         filename,
         'application/json',
-        'Exportar FHIR R5 Bundle',
+        'Exportar FHIR R4 Bundle',
         'public.json'
       );
     } catch (e) {
@@ -345,9 +345,9 @@ export default function ConsultationDetailScreen({ route, navigation }) {
       </TouchableOpacity>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.exportButtonFhirR5} onPress={handleExportFhirR5}>
+        <TouchableOpacity style={styles.exportButtonFhirR4} onPress={handleExportFhirR4}>
           <Ionicons name="document-text-outline" size={18} color="#FFF" />
-          <Text style={styles.exportButtonText}>FHIR R5 Bundle</Text>
+          <Text style={styles.exportButtonText}>FHIR R4 Bundle</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.exportButtonLongCsv} onPress={handleExportLongCsv}>
           <Ionicons name="analytics-outline" size={18} color="#FFF" />
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 10,
   },
-  exportButtonFhirR5: {
+  exportButtonFhirR4: {
     flex: 1,
     backgroundColor: "#6A1B9A",
     flexDirection: "row",

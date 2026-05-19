@@ -1,5 +1,5 @@
 import {
-  buildFhirR5Bundle,
+  buildFhirR4Bundle,
   buildLongFormatCsv,
 } from "../fhirExport";
 
@@ -72,11 +72,11 @@ const mockConsultation = {
 };
 
 // =============================================================================
-// buildFhirR5Bundle (Bundle FHIR R5 tipo document)
+// buildFhirR4Bundle (Bundle FHIR R4 tipo document)
 // =============================================================================
 
-describe("buildFhirR5Bundle — Test de Interoperabilidad FHIR R5", () => {
-  const parsed = JSON.parse(buildFhirR5Bundle(mockConsultation));
+describe("buildFhirR4Bundle — Test de Interoperabilidad FHIR R4", () => {
+  const parsed = JSON.parse(buildFhirR4Bundle(mockConsultation));
   const composition = parsed.entry[0].resource;
   const patientEntry = parsed.entry.find(
     (e) => e.resource.resourceType === "Patient"
@@ -398,7 +398,7 @@ describe("buildLongFormatCsv — Test de CSV Transaccional (Formato Largo)", () 
       fields: [null, ...mockConsultation.fields, null],
     };
 
-    const bundleStr = buildFhirR5Bundle(corrupted);
+    const bundleStr = buildFhirR4Bundle(corrupted);
     const bundle = JSON.parse(bundleStr);
     const resources = bundle.entry.slice(1)
       .filter((e) => e.resource.resourceType !== "Patient")
