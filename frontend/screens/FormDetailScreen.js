@@ -28,7 +28,7 @@ export default function FormDetailScreen({ route, navigation }) {
       [
         { text: "Cancelar", style: "cancel" },
         { text: "Eliminar", style: "destructive", onPress: confirmDelete },
-      ]
+      ],
     );
   };
 
@@ -42,7 +42,10 @@ export default function FormDetailScreen({ route, navigation }) {
       if (response.ok) {
         navigation.goBack();
       } else if (response.status === 403) {
-        Alert.alert("Error", "Las plantillas de sistema no se pueden eliminar.");
+        Alert.alert(
+          "Error",
+          "Las plantillas de sistema no se pueden eliminar.",
+        );
       } else {
         Alert.alert("Error", "No se pudo eliminar la plantilla.");
       }
@@ -75,10 +78,12 @@ export default function FormDetailScreen({ route, navigation }) {
                     [
                       { text: "Cancelar", style: "cancel" },
                       { text: "Crear copia", onPress: handleCopyAndEdit },
-                    ]
+                    ],
                   );
                 } else {
-                  navigation.navigate("FormEditor", { templateId: template.id });
+                  navigation.navigate("FormEditor", {
+                    templateId: template.id,
+                  });
                 }
               }}
               style={{ marginRight: 16 }}
@@ -153,7 +158,7 @@ export default function FormDetailScreen({ route, navigation }) {
   if (!template) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={{ color: "#90A4AE" }}>Plantilla no encontrada</Text>
+        <Text style={{ color: "#7F8C8D" }}>Plantilla no encontrada</Text>
       </View>
     );
   }
@@ -181,32 +186,38 @@ export default function FormDetailScreen({ route, navigation }) {
         )}
       </View>
 
-      {template.fields && template.fields.map((field, index) => {
-        const termStyle = getTerminologyStyle(field.terminology);
-        return (
-          <View key={field.id || index} style={styles.fieldCard}>
-            <View style={styles.fieldHeader}>
-              <Text style={styles.fieldLabel}>{field.label}</Text>
-              <View style={termStyle.badge}>
-                <Text style={termStyle.text}>{field.terminology || "SNOMED"}</Text>
+      {template.fields &&
+        template.fields.map((field, index) => {
+          const termStyle = getTerminologyStyle(field.terminology);
+          return (
+            <View key={field.id || index} style={styles.fieldCard}>
+              <View style={styles.fieldHeader}>
+                <Text style={styles.fieldLabel}>{field.label}</Text>
+                <View style={termStyle.badge}>
+                  <Text style={termStyle.text}>
+                    {field.terminology || "SNOMED"}
+                  </Text>
+                </View>
               </View>
+              <Text style={styles.fieldType}>{field.type}</Text>
+              {field.conceptId && (
+                <Text style={styles.fieldConcept}>
+                  {field.terminology || "SNOMED"}: {field.conceptId}
+                </Text>
+              )}
+              {field.required && (
+                <View style={styles.requiredBadge}>
+                  <Text style={styles.requiredText}>Requerido</Text>
+                </View>
+              )}
             </View>
-            <Text style={styles.fieldType}>{field.type}</Text>
-            {field.conceptId && (
-              <Text style={styles.fieldConcept}>
-                {field.terminology || "SNOMED"}: {field.conceptId}
-              </Text>
-            )}
-            {field.required && (
-              <View style={styles.requiredBadge}>
-                <Text style={styles.requiredText}>Requerido</Text>
-              </View>
-            )}
-          </View>
-        );
-      })}
+          );
+        })}
 
-      <TouchableOpacity style={styles.useButton} onPress={handleUseForConsultation}>
+      <TouchableOpacity
+        style={styles.useButton}
+        onPress={handleUseForConsultation}
+      >
         <Ionicons name="mic-outline" size={20} color="#FFF" />
         <Text style={styles.useButtonText}>Usar para consulta</Text>
       </TouchableOpacity>
@@ -216,8 +227,14 @@ export default function FormDetailScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F5F7FA" },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F7FA",
+  },
   content: { padding: 16, paddingBottom: 40 },
+
   headerCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -274,7 +291,7 @@ const styles = StyleSheet.create({
   },
   fieldCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
     shadowColor: "#000",
@@ -351,7 +368,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },

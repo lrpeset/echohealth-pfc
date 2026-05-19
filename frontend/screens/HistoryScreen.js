@@ -55,8 +55,7 @@ export default function HistoryScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const reason = extractReasonForVisit(item);
-    const category =
-      item.content?.category || item.category || null;
+    const category = item.content?.category || item.category || null;
 
     const iconData = getIconForConsultation(reason, category);
     const dateObj = new Date(item.createdAt);
@@ -126,7 +125,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
     elevation: 1,
     shadowColor: "#000",
@@ -136,11 +135,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E1E4E8",
   },
+
   iconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F2F4F8",
+    backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -160,5 +160,5 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 22,
   },
-  emptyText: { color: "#95A5A6", fontSize: 16 },
+  emptyText: { color: "#7F8C8D", fontSize: 16, fontWeight: "600" },
 });

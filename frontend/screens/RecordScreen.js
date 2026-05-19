@@ -31,7 +31,7 @@ export default function RecordScreen({ navigation }) {
             Alert.alert(
               "Módulo OCR Inteligente",
               "Esta funcionalidad requiere conexión con el módulo externo EchoHealth Vision Cloud (API en desarrollo). Permite escanear informes manuscritos e integrarlos en la estructura actual del paciente.",
-              [{ text: "OK" }]
+              [{ text: "OK" }],
             )
           }
           style={{ marginRight: 20 }}
@@ -121,7 +121,9 @@ export default function RecordScreen({ navigation }) {
     if (!result.fields || !Array.isArray(result.fields)) {
       return false;
     }
-    return result.fields.every(field => field.value === null || field.value === undefined);
+    return result.fields.every(
+      (field) => field.value === null || field.value === undefined,
+    );
   };
 
   async function uploadAudio(uri) {
@@ -133,7 +135,7 @@ export default function RecordScreen({ navigation }) {
 
     const token = await AsyncStorage.getItem("userToken");
     const template = selectedTemplate;
-    const templateName = template?.name || "Consulta General";
+    let templateName = template?.name || "Consulta General";
     let customConfig = [];
 
     if (template?.fields) {
@@ -156,17 +158,20 @@ export default function RecordScreen({ navigation }) {
         });
         if (formsRes.ok) {
           const forms = await formsRes.json();
-          const defaultForm = forms.find((f) => f.name === "Consulta General") || forms[0];
+          const defaultForm =
+            forms.find((f) => f.name === "Consulta General") || forms[0];
           if (defaultForm) {
             templateName = defaultForm.name;
-            customConfig = (defaultForm.fields || []);
+            customConfig = defaultForm.fields || [];
           }
         }
       } catch (_e) {}
     }
 
     if (customConfig.length > 0) {
-      console.log(`Usando plantilla: ${templateName} (${customConfig.length} campos)`);
+      console.log(
+        `Usando plantilla: ${templateName} (${customConfig.length} campos)`,
+      );
     }
 
     const formData = new FormData();
@@ -179,16 +184,24 @@ export default function RecordScreen({ navigation }) {
       const system = field.terminology || "SNOMED";
       const conceptId = field.conceptId || "";
       const term = field.term || "";
-      const fieldId = field.id || `custom_${conceptId.replace(/[^a-zA-Z0-9_]/g, "_")}` || "unknown";
+      const fieldId =
+        field.id ||
+        `custom_${conceptId.replace(/[^a-zA-Z0-9_]/g, "_")}` ||
+        "unknown";
       const fieldLabel = field.label || term || fieldId || "unknown";
       const fieldType = field.type || "snomed-text";
-      formData.append("targetFields", `${fieldId}|${fieldLabel}|${conceptId}|${term}|${system}|${fieldType}`);
+      formData.append(
+        "targetFields",
+        `${fieldId}|${fieldLabel}|${conceptId}|${term}|${system}|${fieldType}`,
+      );
     });
 
     try {
       console.log(`Enviando POST a: ${API_URL}/api/audio/upload`);
-      const targetFieldsLog = customConfig
-        .map(f => `${f.id || "custom_" + (f.conceptId || "unknown").replace(/[^a-zA-Z0-9_]/g, "_")}|${f.label || f.term || f.id || "unknown"}|${f.conceptId || ""}|${f.term || ""}|${f.terminology || "SNOMED"}|${f.type || "snomed-text"}`);
+      const targetFieldsLog = customConfig.map(
+        (f) =>
+          `${f.id || "custom_" + (f.conceptId || "unknown").replace(/[^a-zA-Z0-9_]/g, "_")}|${f.label || f.term || f.id || "unknown"}|${f.conceptId || ""}|${f.term || ""}|${f.terminology || "SNOMED"}|${f.type || "snomed-text"}`,
+      );
       if (targetFieldsLog.length > 0) {
         console.log(`targetFields enviados: [${targetFieldsLog.join(", ")}]`);
       }
@@ -198,13 +211,16 @@ export default function RecordScreen({ navigation }) {
         body: formData,
         headers: {
           "Content-Type": "multipart/form-data",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
       });
 
       const result = await response.json();
 
-      console.log("Respuesta recibida del backend:", JSON.stringify(result, null, 2));
+      console.log(
+        "Respuesta recibida del backend:",
+        JSON.stringify(result, null, 2),
+      );
 
       if (result.error) {
         console.error("Error en respuesta de Gemini:", result.error);
@@ -212,16 +228,23 @@ export default function RecordScreen({ navigation }) {
       }
 
       if (result.fields && Array.isArray(result.fields)) {
-        console.log("Formato estructurado recibido - Campos:", result.fields.length);
+        console.log(
+          "Formato estructurado recibido - Campos:",
+          result.fields.length,
+        );
 
         const allEmpty = hasAllFieldsEmpty(result);
 
         result.fields.forEach((field, index) => {
-          console.log(`   [${index}] ${field.id}: ${field.value} (SNOMED: ${field.conceptId || 'N/A'})`);
+          console.log(
+            `   [${index}] ${field.id}: ${field.value} (SNOMED: ${field.conceptId || "N/A"})`,
+          );
         });
 
         if (allEmpty) {
-          console.warn("Todos los campos están vacíos - Modo fallback detectado");
+          console.warn(
+            "Todos los campos están vacíos - Modo fallback detectado",
+          );
           setIsProcessing(false);
 
           Alert.alert(
@@ -231,11 +254,11 @@ export default function RecordScreen({ navigation }) {
               {
                 text: "OK",
                 onPress: () => {
-                  console.log("Navegando a FormScreen (fallback):", JSON.stringify({ data: result }, null, 2));
+                  console.log("Navegando a FormScreen (fallback):");
                   navigation.navigate("Form", { data: result });
-                }
-              }
-            ]
+                },
+              },
+            ],
           );
           return;
         } else {
@@ -243,7 +266,10 @@ export default function RecordScreen({ navigation }) {
         }
 
         if (result.redFlags && result.redFlags.length > 0) {
-          console.warn("Red flags clínicas detectadas por el backend:", result.redFlags);
+          console.warn(
+            "Red flags clínicas detectadas por el backend:",
+            result.redFlags,
+          );
         }
       } else {
         console.warn("Formato legacy o inesperado recibido");
@@ -253,30 +279,26 @@ export default function RecordScreen({ navigation }) {
       setIsProcessing(false);
 
       if (result.redFlags && result.redFlags.length > 0) {
-        Alert.alert(
-          "⚠️ Alerta Clínica",
-          result.redFlags.join("\n\n"),
-          [
-            {
-              text: "Revisar",
-              style: "cancel",
+        Alert.alert("⚠️ Alerta Clínica", result.redFlags.join("\n\n"), [
+          {
+            text: "Revisar",
+            style: "cancel",
+          },
+          {
+            text: "Continuar",
+            onPress: () => {
+              console.log("Navegando a FormScreen con red flags:");
+              navigation.navigate("Form", { data: result });
             },
-            {
-              text: "Continuar",
-              onPress: () => {
-                console.log("Navegando a FormScreen con red flags:", JSON.stringify({ data: result }, null, 2));
-                navigation.navigate("Form", { data: result });
-              },
-            },
-          ]
-        );
+          },
+        ]);
       } else {
         Alert.alert(
           "¡Audio Analizado!",
           "La IA ha extraído los datos correctamente.",
         );
 
-        console.log("Navegando a FormScreen con datos:", JSON.stringify({ data: result }, null, 2));
+        console.log("Navegando a FormScreen con datos:");
         navigation.navigate("Form", { data: result });
       }
     } catch (error) {
@@ -288,7 +310,7 @@ export default function RecordScreen({ navigation }) {
 
   const getFieldSummary = (t) => {
     if (!t?.fields) return "0 campos";
-    const count = t.fields.filter(f => f.id !== "reasonForVisit").length;
+    const count = t.fields.filter((f) => f.id !== "reasonForVisit").length;
     return `${count} campo${count !== 1 ? "s" : ""}`;
   };
 
@@ -314,7 +336,9 @@ export default function RecordScreen({ navigation }) {
           <ActivityIndicator size="small" color="#4CAF50" />
         ) : (
           <View style={styles.templateSelector}>
-            <Text style={styles.templateLabel}>Seleccione protocolo de consulta</Text>
+            <Text style={styles.templateLabel}>
+              Seleccione protocolo de consulta
+            </Text>
             <TouchableOpacity
               style={styles.templateDropdown}
               onPress={() => setShowPicker(true)}
@@ -327,15 +351,29 @@ export default function RecordScreen({ navigation }) {
                   color={selectedTemplate ? "#4CAF50" : "#CBD5E1"}
                   style={{ marginRight: 10 }}
                 />
-                <Text style={[styles.templateText, !selectedTemplate && styles.templatePlaceholder]}>
-                  {selectedTemplate ? selectedTemplate.name : "Elegir plantilla..."}
+                <Text
+                  style={[
+                    styles.templateText,
+                    !selectedTemplate && styles.templatePlaceholder,
+                  ]}
+                >
+                  {selectedTemplate
+                    ? selectedTemplate.name
+                    : "Elegir plantilla..."}
                 </Text>
               </View>
               <View style={styles.templateDropdownRight}>
                 {selectedTemplate && (
-                  <Text style={styles.templateBadge}>{getFieldSummary(selectedTemplate)}</Text>
+                  <Text style={styles.templateBadge}>
+                    {getFieldSummary(selectedTemplate)}
+                  </Text>
                 )}
-                <Ionicons name="chevron-down" size={20} color="#90A4AE" style={{ marginLeft: 6 }} />
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color="#7F8C8D"
+                  style={{ marginLeft: 6 }}
+                />
               </View>
             </TouchableOpacity>
           </View>
@@ -363,9 +401,22 @@ export default function RecordScreen({ navigation }) {
 
       <View style={styles.bottomSection} />
 
-      <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowPicker(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.pickerSheet}>
+      <Modal
+        visible={showPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPicker(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.pickerSheet}
+          >
             <View style={styles.pickerHandle} />
             <Text style={styles.pickerTitle}>Seleccionar protocolo</Text>
             <ScrollView style={styles.pickerList}>
@@ -374,19 +425,26 @@ export default function RecordScreen({ navigation }) {
                 return (
                   <TouchableOpacity
                     key={t.id}
-                    style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                    style={[
+                      styles.pickerOption,
+                      isSelected && styles.pickerOptionSelected,
+                    ]}
                     onPress={() => handleSelectTemplate(t)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.pickerOptionLeft}>
                       <Ionicons
-                        name={isSelected ? "radio-button-on" : "radio-button-off"}
+                        name={
+                          isSelected ? "radio-button-on" : "radio-button-off"
+                        }
                         size={20}
                         color={isSelected ? "#4CAF50" : "#CBD5E1"}
                       />
                       <View style={styles.pickerOptionInfo}>
                         <Text style={styles.pickerOptionName}>{t.name}</Text>
-                        <Text style={styles.pickerOptionMeta}>{getFieldSummary(t)}</Text>
+                        <Text style={styles.pickerOptionMeta}>
+                          {getFieldSummary(t)}
+                        </Text>
                       </View>
                     </View>
                     {t.userId === "system" && (
@@ -398,7 +456,10 @@ export default function RecordScreen({ navigation }) {
                 );
               })}
             </ScrollView>
-            <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowPicker(false)}>
+            <TouchableOpacity
+              style={styles.pickerCancel}
+              onPress={() => setShowPicker(false)}
+            >
               <Text style={styles.pickerCancelText}>Cancelar</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -410,6 +471,7 @@ export default function RecordScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F7FA" },
+
   topSection: {
     flex: 1,
     justifyContent: "flex-end",
@@ -451,7 +513,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
@@ -519,7 +581,6 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 10,
   },
-
   processingCircle: {
     width: 140,
     height: 140,
@@ -529,7 +590,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.05,
     shadowRadius: 20,
     elevation: 5,
   },
@@ -573,7 +634,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 14,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 4,
   },
   pickerOptionSelected: {
@@ -594,7 +655,7 @@ const styles = StyleSheet.create({
   },
   pickerOptionMeta: {
     fontSize: 12,
-    color: "#90A4AE",
+    color: "#7F8C8D",
     marginTop: 2,
   },
   systemBadge: {
@@ -613,11 +674,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
     backgroundColor: "#F5F7FA",
-    borderRadius: 12,
+    borderRadius: 16,
   },
   pickerCancelText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#90A4AE",
+    color: "#7F8C8D",
   },
 });
