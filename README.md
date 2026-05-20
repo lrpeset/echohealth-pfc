@@ -39,7 +39,7 @@ La plataforma cuenta con un entorno de pruebas automatizadas que valida la estab
 
 ---
 
-## 📂 Estructura Real del Repositorio
+## Estructura del Repositorio
 
 ```text
 echohealth-pfc/
