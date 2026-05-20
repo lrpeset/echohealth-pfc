@@ -1,0 +1,735 @@
+import React, { useState, useLayoutEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { getIconForConsultation } from "../utils/iconUtils";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import { API_URL } from "../config";
+import { buildFhirR4Bundle, buildLongFormatCsv } from "../utils/fhirExport";
+
+export default function ConsultationDetailScreen({ route, navigation }) {
+  const { consultationId } = route.params;
+  const [consultation, setConsultation] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    fetchConsultation();
+
+    navigation.setOptions({
+      headerStyle: {
+        backgroundColor: "#F5F7FA",
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 0,
+      },
+      headerTintColor: "#2C3E50",
+      headerTitleStyle: {
+        fontWeight: "700",
+      },
+    });
+  }, [consultationId]);
+
+  const fetchConsultation = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await fetch(
+        `${API_URL}/api/consultations/${consultationId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (response.ok) {
+        setConsultation(await response.json());
+      }
+    } catch (e) {
+      console.error("Error loading consultation:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatTime = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const isRedFlag = (field) => {
+    if (!field) return false;
+    const t = (field.term || "").toLowerCase();
+    const l = (field.label || "").toLowerCase();
+    return (
+      t.includes("red flag") ||
+      t.includes("alerta") ||
+      l.includes("red flag") ||
+      l.includes("alerta")
+    );
+  };
+
+  const buildExportMetadata = (consultation) => {
+    const fields = consultation?.fields || [];
+    const hasRedFlags = fields.some(isRedFlag);
+    const fechaLimpia = consultation?.createdAt
+      ? consultation.createdAt.split("T")[0]
+      : "export";
+    const refConsulta = consultation?.id
+      ? consultation.id.substring(0, 6)
+      : "unknown";
+    return { hasRedFlags, fechaLimpia, refConsulta };
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
+  if (!consultation) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color="#CFD8DC" />
+        <Text style={styles.errorText}>No se pudo cargar la consulta</Text>
+      </View>
+    );
+  }
+
+  if (!consultation?.fields || consultation.fields.length === 0) {
+    if (consultation.content && typeof consultation.content === "object") {
+      consultation.fields = Object.entries(consultation.content)
+        .filter(([, v]) => v != null)
+        .map(([key, value]) => ({
+          id: key,
+          label: key,
+          type:
+            value != null && !isNaN(Number(value))
+              ? "loinc-number"
+              : "snomed-text",
+          value,
+          conceptId: null,
+          term: null,
+          terminology: "SNOMED",
+          semanticTag: null,
+          conceptVerified: false,
+        }));
+    }
+  }
+
+  const loincFields =
+    consultation.fields?.filter(
+      (f) => f.terminology === "LOINC" && f.value != null,
+    ) || [];
+  const snomedFields =
+    consultation.fields?.filter(
+      (f) => (f.terminology === "SNOMED" || !f.terminology) && f.value != null,
+    ) || [];
+
+  const reasonField = snomedFields.find((f) => f.id === "reasonForVisit");
+  const otherSnomedFields = snomedFields.filter(
+    (f) => f.id !== "reasonForVisit",
+  );
+
+  const hasRedFlag = [...loincFields, ...snomedFields].some(isRedFlag);
+
+  const consultationIcon = getIconForConsultation(
+    reasonField?.value || consultation.content?.reasonForVisit || "",
+    consultation.content?.category || consultation.category || "",
+  );
+
+  const renderTerminologyBadge = (field) => {
+    const isLoinc = field.terminology === "LOINC";
+    const color = isLoinc ? "#1565C0" : "#4CAF50";
+    const bgColor = isLoinc ? "#E3F2FD" : "#E8F5E9";
+    const label = isLoinc ? "LOINC" : "SNOMED";
+    return (
+      <View style={[styles.termBadge, { backgroundColor: bgColor }]}>
+        <Text style={[styles.termBadgeText, { color }]}>{label}</Text>
+      </View>
+    );
+  };
+
+  const buildReportText = () => {
+    const lines = [];
+    if (reasonField) {
+      lines.push(`Motivo: ${reasonField.value}`);
+    }
+    loincFields.forEach((f) => {
+      lines.push(`${f.label}: ${f.value}`);
+    });
+    otherSnomedFields.forEach((f) => {
+      lines.push(`${f.label}: ${f.value}`);
+    });
+    return lines.join(" | ");
+  };
+
+  const handleCopyReport = async () => {
+    const text = buildReportText();
+    try {
+      await Clipboard.setStringAsync(text);
+      alert("Informe copiado al portapapeles");
+    } catch (e) {
+      console.error("Error copying report to clipboard:", e.message, e.stack);
+      alert("No se pudo copiar el texto");
+    }
+  };
+
+  const exportFile = async (content, filename, mimeType, dialogTitle, uti) => {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      console.warn(
+        "⚠️ FileSystem.cacheDirectory is null — fallback to clipboard only",
+      );
+      return;
+    }
+
+    const fileUri = cacheDir + filename;
+
+    await FileSystem.writeAsStringAsync(fileUri, content, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    const sharingAvailable = await Sharing.isAvailableAsync();
+    if (!sharingAvailable) {
+      console.warn(
+        "⚠️ Sharing.isAvailableAsync() = false — fallback to clipboard only",
+      );
+      return;
+    }
+
+    await Sharing.shareAsync(fileUri, { mimeType, dialogTitle, UTI: uti });
+  };
+
+  const handleExportFhirR4 = async () => {
+    try {
+      const fhirBundle = buildFhirR4Bundle(consultation);
+      await Clipboard.setStringAsync(fhirBundle);
+
+      const { hasRedFlags, fechaLimpia, refConsulta } =
+        buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? "ALERT_" : "";
+      const filename = `${prefix}FHIR_Doc_Ref_${refConsulta}_${fechaLimpia}.json`;
+
+      await exportFile(
+        fhirBundle,
+        filename,
+        "application/json",
+        "Exportar FHIR R4 Bundle",
+        "public.json",
+      );
+    } catch (e) {
+      console.error(
+        "💥 ERROR CRÍTICO DE EXPORTACIÓN [FHIR]:",
+        e.message,
+        e.stack,
+      );
+      alert(
+        "Error al exportar el archivo FHIR .json. Los datos están en el portapapeles.",
+      );
+    }
+  };
+
+  const handleExportLongCsv = async () => {
+    try {
+      const longCsv = buildLongFormatCsv(consultation);
+      await Clipboard.setStringAsync(longCsv);
+
+      const { hasRedFlags, fechaLimpia, refConsulta } =
+        buildExportMetadata(consultation);
+      const prefix = hasRedFlags ? "ALERT_" : "";
+      const filename = `${prefix}Analytics_Ref_${refConsulta}_${fechaLimpia}.csv`;
+
+      await exportFile(
+        longCsv,
+        filename,
+        "text/csv",
+        "Exportar Analytics CSV",
+        "public.comma-separated-values-text",
+      );
+    } catch (e) {
+      console.error(
+        "💥 ERROR CRÍTICO DE EXPORTACIÓN [CSV]:",
+        e.message,
+        e.stack,
+      );
+      alert(
+        "Error al exportar el archivo CSV .csv. Los datos están en el portapapeles.",
+      );
+    }
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerBanner}>
+        <View style={styles.headerIconRow}>
+          <View
+            style={[
+              styles.headerIcon,
+              { backgroundColor: consultationIcon.color + "33" },
+            ]}
+          >
+            <Ionicons
+              name={consultationIcon.name}
+              size={28}
+              color={consultationIcon.color}
+            />
+          </View>
+          <View style={styles.headerTextCol}>
+            <Text style={styles.headerTitle}>
+              Resumen de Inteligencia Clínica
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {formatDate(consultation.createdAt)} ·{" "}
+              {formatTime(consultation.createdAt)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {hasRedFlag && (
+        <View style={styles.redFlagBanner}>
+          <Ionicons name="warning" size={20} color="#D32F2F" />
+          <Text style={styles.redFlagBannerText}>
+            Esta consulta contiene alertas de seguridad clínica
+          </Text>
+        </View>
+      )}
+
+      {reasonField && (
+        <View style={styles.reasonCard}>
+          <View style={styles.reasonHeader}>
+            <Ionicons name="chatbubble-ellipses" size={18} color="#2C3E50" />
+            <Text style={styles.reasonLabel}>Motivo de la consulta</Text>
+          </View>
+          <Text style={styles.reasonValue}>{reasonField.value}</Text>
+        </View>
+      )}
+
+      {loincFields.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionBadge, { backgroundColor: "#E3F2FD" }]}>
+              <Ionicons name="pulse-outline" size={16} color="#1565C0" />
+              <Text style={[styles.sectionBadgeText, { color: "#1565C0" }]}>
+                Mediciones y Tests
+              </Text>
+            </View>
+            <Text style={styles.sectionCount}>{loincFields.length}</Text>
+          </View>
+          <View style={styles.metricsGrid}>
+            {loincFields.map((field, idx) => {
+              const flag = isRedFlag(field);
+              return (
+                <View
+                  key={field.id || idx}
+                  style={[styles.metricCard, flag && styles.redFlagCard]}
+                >
+                  <View style={styles.metricTop}>
+                    <Ionicons
+                      name="speedometer-outline"
+                      size={20}
+                      color="#1565C0"
+                    />
+                    {flag && (
+                      <Ionicons name="warning" size={18} color="#D32F2F" />
+                    )}
+                  </View>
+                  <Text style={styles.metricValue}>{String(field.value)}</Text>
+                  <Text style={styles.metricLabel}>{field.label}</Text>
+                  <View style={styles.metricBadgeRow}>
+                    {renderTerminologyBadge(field)}
+                    {field.conceptId && (
+                      <Text style={styles.metricCode}>
+                        {field.terminology === "LOINC" ? "LOINC" : "SNOMED"}:{" "}
+                        {field.conceptId}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {otherSnomedFields.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionBadge, { backgroundColor: "#E8F5E9" }]}>
+              <Ionicons name="search-outline" size={16} color="#2E7D32" />
+              <Text style={[styles.sectionBadgeText, { color: "#2E7D32" }]}>
+                Hallazgos Clínicos
+              </Text>
+            </View>
+            <Text style={styles.sectionCount}>{otherSnomedFields.length}</Text>
+          </View>
+          {otherSnomedFields.map((field, idx) => {
+            const flag = isRedFlag(field);
+            return (
+              <View
+                key={field.id || idx}
+                style={[styles.findingCard, flag && styles.redFlagCard]}
+              >
+                <View style={styles.findingHeader}>
+                  <View style={styles.findingLeft}>
+                    <Ionicons name="medical" size={16} color="#4CAF50" />
+                    <Text style={styles.findingLabel}>{field.label}</Text>
+                    {renderTerminologyBadge(field)}
+                  </View>
+                  {flag && (
+                    <Ionicons name="warning" size={18} color="#D32F2F" />
+                  )}
+                </View>
+                <Text style={styles.findingValue}>{String(field.value)}</Text>
+                {field.conceptId && (
+                  <Text style={styles.findingCode}>
+                    {field.terminology === "LOINC" ? "LOINC" : "SNOMED"}:{" "}
+                    {field.conceptId}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.copyButton} onPress={handleCopyReport}>
+        <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.copyButtonText}>Copiar Informe Médico</Text>
+      </TouchableOpacity>
+
+      <View style={styles.exportRow}>
+        <TouchableOpacity
+          style={styles.exportButtonFhirR4}
+          onPress={handleExportFhirR4}
+        >
+          <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.exportButtonText}>FHIR R4 Bundle</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.exportButtonLongCsv}
+          onPress={handleExportLongCsv}
+        >
+          <Ionicons name="analytics-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.exportButtonText}>CSV Long-Format</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F5F7FA" },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F7FA",
+    gap: 12,
+  },
+  errorText: {
+    fontSize: 15,
+    color: "#90A4AE",
+    fontWeight: "600",
+  },
+  content: { paddingBottom: 40 },
+
+  headerBanner: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginHorizontal: 16,
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  headerIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTextCol: { flex: 1 },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#2C3E50",
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "#7F8C8D",
+    fontWeight: "500",
+  },
+
+  redFlagBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFEBEE",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 10,
+  },
+  redFlagBannerText: {
+    fontSize: 13,
+    color: "#D32F2F",
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  reasonCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  reasonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  reasonLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#7F8C8D",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  reasonValue: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+    lineHeight: 26,
+  },
+
+  section: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 6,
+  },
+  sectionBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  sectionCount: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#90A4AE",
+  },
+
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  metricCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    width: "48%",
+    minWidth: 140,
+    flexGrow: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  metricTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1565C0",
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: "#546E7A",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  metricCode: {
+    fontSize: 10,
+    color: "#90A4AE",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+
+  findingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  findingHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  findingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  findingLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#7F8C8D",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  findingValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    lineHeight: 22,
+  },
+  findingCode: {
+    fontSize: 10,
+    color: "#90A4AE",
+    marginTop: 6,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+
+  termBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  termBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
+  metricBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
+  },
+
+  redFlagCard: {
+    borderWidth: 2,
+    borderColor: "#D32F2F",
+  },
+
+  copyButton: {
+    backgroundColor: "#4CAF50",
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  copyButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  exportRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  exportButtonFhirR4: {
+    flex: 1,
+    backgroundColor: "#6A1B9A",
+    flexDirection: "row",
+    paddingVertical: 14,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  exportButtonLongCsv: {
+    flex: 1,
+    backgroundColor: "#00838F",
+    flexDirection: "row",
+    paddingVertical: 14,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  exportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+});

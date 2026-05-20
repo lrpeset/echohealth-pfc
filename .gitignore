@@ -1,14 +1,62 @@
-# Dependencies
-**/node_modules/
-**/target/
-**/.expo/
-
-# IDEs & System
+# --- GENERAL & IDEs ---
 .vscode/
 .idea/
 .DS_Store
 *.log
+*.pem
+*.swp
+*.iws
+*.iml
+*.ipr
 
-# Secrets
+# --- SECRETS ---
 .env
+.env*.local
 .api-key
+secrets.properties
+
+# --- GLOBAL DEPENDENCIES & BUILD ---
+**/node_modules/
+**/target/
+**/.expo/
+**/build/
+**/bin/
+
+# --- FRONTEND (Expo / React Native) ---
+frontend/dist/
+frontend/web-build/
+frontend/expo-env.d.ts
+frontend/npm-debug.*
+frontend/yarn-debug.*
+frontend/yarn-error.*
+frontend/*.tsbuildinfo
+
+# Native Mobile Folders & Signing
+frontend/ios/
+frontend/android/
+frontend/.kotlin/
+frontend/*.jks
+frontend/*.p8
+frontend/*.p12
+frontend/*.key
+frontend/*.mobileprovision
+frontend/*.orig.*
+frontend/.metro-health-check*
+
+# --- BACKEND (Java / Spring Boot / Maven) ---
+backend/HELP.md
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/.apt_generated
+backend/.classpath
+backend/.factorypath
+backend/.project
+backend/.settings
+backend/.springBeans
+backend/.sts4-cache
+
+# NetBeans specific
+backend/nbproject/private/
+backend/nbbuild/
+backend/dist/
+backend/nbdist/
+backend/.nb-gradle/

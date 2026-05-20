@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "EchoHealth",
+    "slug": "echohealth",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F7FA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.echohealth.app",
+      "infoPlist": {
+        "NSCachesDirectoryDescription": "Acceso a la caché local para la exportación y firma de archivos clínicos interoperables HL7 FHIR."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E8F5E9",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.echohealth.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-file-system"
+    ]
+  }
+}
