@@ -44,7 +44,10 @@ export default function HomeScreen({ navigation }) {
     if (MOCK_MODE) {
       console.log("🛠️ Usando datos de MOCK");
       setTimeout(() => {
-        setRecentConsultations(mockConsultations.slice(0, 3));
+        const sortedMock = [...mockConsultations].sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+        );
+        setRecentConsultations(sortedMock.slice(0, 3));
         setLoading(false);
       }, 500);
       return;
@@ -58,9 +61,13 @@ export default function HomeScreen({ navigation }) {
         },
       });
       const data = await response.json();
-      setRecentConsultations(data.slice(0, 3));
+
+      const sortedData = [...data].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      );
+      setRecentConsultations(sortedData.slice(0, 3));
     } catch (error) {
-      console.error("Error en conexión real:", error); // Deshabilitado para producción
+      console.error("Error en conexión real:", error);
     } finally {
       setLoading(false);
     }
@@ -203,7 +210,6 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   mainButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-
   listContainer: { flex: 1, padding: 20 },
   sectionTitle: {
     fontSize: 18,
@@ -246,7 +252,6 @@ const styles = StyleSheet.create({
     color: "#2C3E50",
   },
   emptyText: { textAlign: "center", color: "#7F8C8D", marginTop: 20 },
-
   secondaryButton: {
     flexDirection: "row",
     marginTop: 10,
