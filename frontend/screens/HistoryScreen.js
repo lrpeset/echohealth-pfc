@@ -37,7 +37,10 @@ export default function HistoryScreen({ navigation }) {
     if (MOCK_MODE) {
       console.log("🛠️ Historial: Usando datos de MOCK");
       setTimeout(() => {
-        setConsultations(mockConsultations);
+        const sortedMock = [...mockConsultations].sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+        );
+        setConsultations(sortedMock);
         setLoading(false);
       }, 500);
       return;
@@ -51,7 +54,12 @@ export default function HistoryScreen({ navigation }) {
         },
       });
       const data = await response.json();
-      setConsultations(data);
+
+      const sortedData = [...data].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      );
+
+      setConsultations(sortedData);
     } catch (error) {
       console.error("Error al obtener el historial real:", error);
     } finally {
@@ -148,7 +156,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-
   iconContainer: {
     width: 40,
     height: 40,

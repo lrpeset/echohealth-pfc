@@ -31,6 +31,7 @@ const CONDITION_SEMANTIC_TAGS = new Set([
   "malformation",
 ]);
 
+// Diccionario de unidades canónicas UCUM
 const LOINC_UNITS = {
   "8302-2": { unit: "cm", code: "cm" },
   "29463-7": { unit: "kg", code: "kg" },
@@ -41,6 +42,17 @@ const LOINC_UNITS = {
   "8462-4": { unit: "mmHg", code: "mm[Hg]" },
   "72514-3": { unit: "{score}", code: "{score}" },
   "9303-7": { unit: "meters", code: "m" },
+};
+
+// Blindaje Terminológico: Exigencia estricta del Validador HL7 para perfiles Vital Signs
+const CANONICAL_LOINC_DISPLAYS = {
+  "85354-9": "Blood pressure panel with all children optional",
+  "2708-6": "Oxygen saturation in Arterial blood",
+  "8302-2": "Body height",
+  "29463-7": "Body weight",
+  "8867-4": "Heart rate",
+  "8480-6": "Systolic blood pressure",
+  "8462-4": "Diastolic blood pressure",
 };
 
 // =========================================================================
@@ -103,6 +115,13 @@ function parseBloodPressure(value) {
 function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
   const isReason = field.id === "reasonForVisit";
 
+  // Interceptamos y forzamos la nomenclatura canónica si es un LOINC controlado, si no, mantenemos el valor de la IA
+  const resolvedDisplay = isReason
+    ? "Chief complaint Narrative - Reported"
+    : (field.terminology === "LOINC" && CANONICAL_LOINC_DISPLAYS[field.conceptId])
+      ? CANONICAL_LOINC_DISPLAYS[field.conceptId]
+      : field.term || field.label || "";
+
   const resource = {
     resourceType: "Observation",
     id: `obs-${idx}`,
@@ -120,9 +139,7 @@ function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
               ? FHIR_SYSTEMS.LOINC
               : FHIR_SYSTEMS.SNOMED,
           code: isReason ? "10154-3" : field.conceptId || "unknown",
-          display: isReason
-            ? "Chief complaint Narrative - Reported"
-            : field.term || field.label || "",
+          display: resolvedDisplay,
         },
       ],
       text: isReason
@@ -146,8 +163,7 @@ function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
       {
         coding: [
           {
-            system:
-              "http://terminology.hl7.org/CodeSystem/observation-category",
+            system: "http://terminology.hl7.org/CodeSystem/observation-category",
             code: "vital-signs",
             display: "Vital Signs",
           },
@@ -162,7 +178,6 @@ function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
   }
 
   const isLoincNumber = field.type && field.type.endsWith("-number");
-
   const numericValue = parseNumeric(field.value);
 
   // Tratamiento especializado para paneles compuestos: desglosa presión arterial en componentes sistólico/diastólico
@@ -177,7 +192,7 @@ function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
               {
                 system: FHIR_SYSTEMS.LOINC,
                 code: "8480-6",
-                display: "Systolic blood pressure",
+                display: CANONICAL_LOINC_DISPLAYS["8480-6"],
               },
             ],
           },
@@ -194,7 +209,7 @@ function mapFieldToObservation(field, idx, clinicalDate, patientUuid) {
               {
                 system: FHIR_SYSTEMS.LOINC,
                 code: "8462-4",
-                display: "Diastolic blood pressure",
+                display: CANONICAL_LOINC_DISPLAYS["8462-4"],
               },
             ],
           },
@@ -305,7 +320,7 @@ function mapFieldToFhirResource(field, idx, clinicalDate, patientUuid) {
 }
 
 // =========================================================================
-// COMPOSICIÓN Y MANIFIESTO ESTRUCTURAL DEL DOCUMENTO CLINICO
+// COMPOSICIÓN Y MANIFIESTO ESTRUCTURAL DEL DOCUMENTO CLÍNICO
 // =========================================================================
 
 const SECTION_DISPLAY_NAMES = {
@@ -385,13 +400,6 @@ function buildComposition(consultation, sectionEntries, patientUuid) {
 // PASARELAS DE EXPORTACIÓN PÚBLICA (APIs DEL MÓDULO)
 // =========================================================================
 
-/**
- * Convierte un objeto de consulta EAV en un grafo canónico Bundle FHIR R4 (type: document).
- * Restringe la anonimización de recursos distributivos para cumplimiento estricto de la LOPDGDD.
- *
- * @param {Object} consultation - Instancia transaccional polimórfica de consulta.
- * @returns {string} Payload serializado en formato JSON estandarizado HL7.
- */
 export function buildFhirR4Bundle(consultation) {
   const fields = consultation?.fields || [];
   const now = nowISO();
@@ -514,13 +522,6 @@ const CSV_LONG_HEADER = [
   "tipo_semantico",
 ].join(",");
 
-/**
- * Compila una matriz plana relacional en formato largo (Long-Format EAV).
- * Optimiza los registros para su ingesta inmediata en pipelines analíticos de ciencia de datos.
- *
- * @param {Object} consultation - Instancia transaccional polimórfica de consulta.
- * @returns {string} Buffer de texto plano separado por comas conformes a RFC 4180.
- */
 export function buildLongFormatCsv(consultation) {
   const fields = consultation?.fields || [];
   const consultaId = consultation.id || "";
